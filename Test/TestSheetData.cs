@@ -8,7 +8,9 @@ namespace Mobge.Sheets.Test {
         [Serializable]
         public struct Row {
             public string name;
+            public int score;
             public Sprite icon;
+            public ItemSet.ItemPath weapon;
         }
     }
 }

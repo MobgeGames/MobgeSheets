@@ -10,9 +10,8 @@ using UnityEngine.Networking;
 namespace Mobge.Sheets {
 	[CreateAssetMenu(menuName = "Mobge/Sheets/Data")]
     public class SheetData<T> : SheetData {
-        
         public T[] data;
-        protected override Type RowType => typeof(T);
+        public override Type RowType => typeof(T);
         internal override void UpdateData(object[] rows) {
             this.data = rows.Cast<T>().ToArray();
             OnDataUpdate();
@@ -24,8 +23,31 @@ namespace Mobge.Sheets {
     public abstract class SheetData : ScriptableObject {
         public GoogleSheet googleSheet;
         public CellId tableStart;
-        protected abstract Type RowType { get; }
+        [Disabled, SerializeField, SerializeReference] public Mapping[] mappings;
+        public abstract Type RowType { get; }
         internal abstract void UpdateData(object[] rows);
+
+        
+        [Serializable]
+        public abstract class Mapping {
+            public string fieldName;
+            public abstract object GetObject(string key);
+        }
+        [Serializable]
+        public class DefaultMapping : Mapping {
+            public object defaultValue;
+            public Pair[] pairs;
+
+            public override object GetObject(string key) {
+                // implement over pairs
+                throw new NotImplementedException();
+            }
+        }
+        [Serializable]
+        public struct Pair {
+            public string key;
+            [SerializeReference] public object value;
+        }
     }
     [Serializable]
     public struct CellId {
@@ -59,6 +81,13 @@ namespace Mobge.Sheets {
         public static string Add(string column, int offset) {
             int index = ColumnToIndex(column);
             return IndexToColumn(index + offset);
+        }
+        public string GetRange(int2 size) {
+            string range = column + row;
+            range += ":";
+            range += CellId.Add(column, size.x - 1);
+            range += row + size.y - 1;
+            return range;
         }
         
     }
