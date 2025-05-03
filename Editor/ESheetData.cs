@@ -2,15 +2,13 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEditor;
-using Mobge.Sheets;
 using System;
-using System.Net.Http;
-using System.Threading.Tasks;
-using Unity.Mathematics;
 using Mobge.Serialization;
-using Mobge.Sheets.Test;
+using SerializeReferenceEditor.Editor;
+using SerializeReferenceEditor;
+using System.Text;
 
-namespace Mobge.DoubleKing {
+namespace Mobge.Sheets {
     [CustomPropertyDrawer(typeof(CellId))]
     public class CellIdDrawer : PropertyDrawer {
         public override void OnGUI(Rect position, SerializedProperty property, GUIContent label) {
@@ -28,8 +26,11 @@ namespace Mobge.DoubleKing {
         }
     }
     [CustomEditor(typeof(SheetData), true)]
-    public class ESheetData : Editor {
+    public partial class ESheetData : Editor {
         private SheetData _go;
+
+        private SRDrawer _srDrawer;
+        private Dictionary<Type, SRAttribute> _srAttributes;
 
         private EditorFoldGroups _groups;
         private ExposedList<MappingRef> _mappingRefs;
@@ -37,68 +38,143 @@ namespace Mobge.DoubleKing {
             public bool valid;
             public int index;
             public string name;
+            public Type fieldType;
         }
 
         protected void OnEnable() {
             _go = target as SheetData;
             _groups = new EditorFoldGroups(EditorFoldGroups.FilterMode.NoFilter);
             _mappingRefs = new();
+            _srDrawer = new();
+            _srAttributes = new();
+        }
+
+        private SerializedProperty FindProperty(string name) {
+            var root = serializedObject.GetIterator();
+            root.Reset();
+            root.NextVisible(true);
+            do {
+                if(root.propertyPath == name) {
+                    return root;
+                }
+            }
+            while(root.NextVisible(false));
+            return default;
         }
 
         public override void OnInspectorGUI() {
             
+            serializedObject.Update();
+            
             Undo.RecordObject(_go, "sheet data edit");
-            var p = serializedObject.GetIterator();
-            p.Next(true);
-            while(p.Next(false)) {
-                if(p.propertyPath != nameof(SheetData.mappings)) {
+            var root = serializedObject.GetIterator();
+            
+            root.NextVisible(true);
+            var p = root;
+            do {
+                if(p.propertyPath != nameof(SheetData.mappings) && p.propertyPath != nameof(SheetData<int>.data)) {
                     EditorGUILayout.PropertyField(p, true);
                 }
             }
-            _groups.GuilayoutField(CreateFields);
-            if(GUILayout.Button("Update Sheet")) {
-                UpdateSheet();
+            while(p.NextVisible(false));
+            serializedObject.ApplyModifiedProperties();
+           
+            
+            MappingsEditor();
+            if(GUILayout.Button("Update From Sheet")) {
+                UpdateFromSheet();
             }
+            EditorGUILayout.PropertyField(FindProperty(nameof(SheetData<int>.data)));
+            serializedObject.ApplyModifiedProperties();
+            
             if(GUI.changed) {
-                serializedObject.ApplyModifiedProperties();
                 EditorExtensions.SetDirty(_go);
             }
         }
-        private void CreateFields(EditorFoldGroups.Group group) {
-            group.AddChild("Mappings", () => {
-                if(_go.mappings == null) {
-                    _go.mappings = new SheetData.Mapping[0];
+        private void MappingsEditor() {
+            var pMappings = FindProperty(nameof(SheetData.mappings));
+            pMappings.isExpanded = EditorGUILayout.Foldout(pMappings.isExpanded, "Columns", true);
+            if(!pMappings.isExpanded) {
+                return;
+            }
+            UpdateMappings(out int validCount);
+            EditorGUILayout.BeginHorizontal();
+            //EditorGUILayout.LabelField("Columns", GUILayout.Width(110));
+            for(int i = 0; i < _mappingRefs.Count; i++) {
+                var mr = _mappingRefs.array[i];
+                bool dEnabled = GUI.enabled;
+                GUI.enabled = dEnabled && mr.valid && mr.index < 0;
+                if(GUILayout.Button(mr.name, GUILayout.ExpandWidth(false))) {
+                    var nm = new SheetData.MappingEntry();
+                    nm.fieldName = mr.name;
+                    ArrayUtility.Add(ref _go.mappings, nm);
                 }
-                UpdateMappings(out int validCount);
-                EditorGUILayout.BeginHorizontal();
-                EditorGUILayout.LabelField("Add Mapping", GUILayout.Width(110));
-                for(int i = 0; i < _mappingRefs.Count; i++) {
-                    var mr = _mappingRefs.array[i];
-                    if(mr.index < 0) {
-                        if(GUILayout.Button(mr.name)) {
-                            var nm = new TestSheetData.DefaultMapping();
-                            nm.fieldName = mr.name;
-                            ArrayUtility.Add(ref _go.mappings, nm);
-                        }
-                    }
-                }
-                EditorGUILayout.EndHorizontal();
-                EditorGUI.BeginChangeCheck();
-                var pMappings = this.serializedObject.FindProperty(nameof(SheetData.mappings));
-                MappingsField(pMappings);
-            });
+                GUI.enabled = dEnabled;
+                
+            }
+            EditorGUILayout.EndHorizontal();
+            
+            EditorGUI.indentLevel++;
+            MappingsField(pMappings);
+            serializedObject.ApplyModifiedProperties();
+            EditorGUI.indentLevel--;
+        }
+        private SRAttribute GetSrAttribute(Type type) {
+            if(!_srAttributes.TryGetValue(type, out var att)) {
+                var gType = typeof(SheetData.AMapping<>).MakeGenericType(type);
+                att = new SRAttribute(gType);
+                _srAttributes.Add(type, att);
+            }
+            return att;
         }
         private void MappingsField(SerializedProperty pMappings) {
-            
+            int deleteIndex = -1;
             for(int i = 0; i < _mappingRefs.Count; i++) {
                 var mr = _mappingRefs.array[i];
                 if(mr.index < 0) {
                     continue;
                 }
                 var pMapping = pMappings.GetArrayElementAtIndex(mr.index);
-                EditorGUILayout.PropertyField(pMapping, true);
-                
+                var pMap = pMapping.FindPropertyRelative(nameof(SheetData.MappingEntry.mapping));
+                EditorGUILayout.BeginVertical("Box");
+                EditorGUILayout.BeginHorizontal();
+                EditorGUILayout.LabelField(mr.name);
+                if(GUILayout.Button("List Keys")) {
+                    SheetData.AMapping mapping =  pMap.ReadObject<SheetData.AMapping>(out _);
+                    if(mapping != null) {
+                        List<string> allKeys = new();
+                        mapping.GetAllKeys(allKeys);
+                        StringBuilder sb = new();
+                        sb.AppendLine("All Keys of field: " + mr.name);
+                        foreach(var k in allKeys) {
+                            sb.AppendLine(k);
+
+                        }
+                        Debug.Log(sb);
+                    }
+                    else {
+                        Debug.Log("Mapping is not set");
+                    }
+                }
+                if(GUILayout.Button("X")) {
+                    deleteIndex = mr.index;
+                }
+                EditorGUILayout.EndHorizontal();
+                if(mr.fieldType != null) {
+                    _srDrawer.SetAttribute(GetSrAttribute(mr.fieldType));
+                    var gc = new GUIContent(pMap.displayName);
+                    float height = _srDrawer.GetPropertyHeight(pMap, gc);
+                    var rect = EditorGUILayout.GetControlRect(true, height);
+                    _srDrawer.OnGUI(rect, pMap, gc);
+                }
+                EditorGUILayout.EndVertical();
             }
+            if(deleteIndex >= 0) {
+                
+                GUI.changed = true;
+                pMappings.DeleteArrayElementAtIndex(deleteIndex);
+            }
+            
         }
         private int IndexOfMapping(int count, string fieldName) {
             for(int i = 0; i < count; i++) {
@@ -113,13 +189,11 @@ namespace Mobge.DoubleKing {
             if(BinarySerializer.TryGetFields(_go.RowType, out var fields)) {
                 for(int i = 0; i < fields.Length; i++) {
                     var field = fields[i];
-                    if(IsPrimitive(field.FieldType)) {
-                        continue;
-                    }
                     MappingRef mr;
                     mr.name = field.Name;
-                    mr.valid = true;
+                    mr.valid = !IsPrimitive(field.FieldType);
                     mr.index = -1;
+                    mr.fieldType = field.FieldType;
                     _mappingRefs.Add(mr);
                 }
             }
@@ -135,6 +209,7 @@ namespace Mobge.DoubleKing {
                     mr.name = m.fieldName;
                     mr.valid = false;
                     mr.index = i;
+                    mr.fieldType = default;
                     _mappingRefs.Add(mr);
                 }
             }
@@ -143,48 +218,6 @@ namespace Mobge.DoubleKing {
             return t == typeof(int) || t == typeof(string) || t == typeof(bool) || t == typeof(float) || t == typeof(long) || t == typeof(double);
         }
 
-        private async void UpdateSheet() {
-            int2 size = await DetectSize();
-            var range = _go.tableStart.GetRange(size);
-            Debug.Log("Range: " + range);
-        }
-
-        private async Task<int2> DetectSize() {
-            var start = _go.tableStart;
-            if(string.IsNullOrEmpty(start.column)) {
-                start.column = "A";
-            }
-            if(start.row <= 0) {
-                start.row = 1;
-            }
-            string rangeH = start.column + start.row + ':' + start.row;
-            string rangeV = start.column + start.row + ':' + start.column;
-            var nodes = await _go.googleSheet.GetValues(Dimension.ROWS, rangeH, rangeV);
-            if(nodes.IsNullOrEmpty()) {
-                return default;
-            }
-            var nodeH = nodes[0];
-            var nodeV = nodes[1];
-            int2 size = new int2(1,1);
-
-            if(nodeH.Count > 0) {
-                var valsH = nodeH[0].AsArray;
-                for(int i = 1; i < valsH.Count; i++) {
-                    if(string.IsNullOrEmpty(valsH[i].Value)) {
-                        break;
-                    }
-                    size.x++;
-                }
-            }
-            for(int i = 1; i < nodeV.Count; i++) {
-                if(nodeV[i].AsArray.Count == 0) {
-                    break;
-                }
-                size.y++;
-            }
-
-
-            return size;
-        }
+       
     }
 }

@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using SerializeReferenceEditor;
 using Sirenix.OdinInspector;
 using Unity.Mathematics;
 using UnityEngine;
@@ -12,7 +13,7 @@ namespace Mobge.Sheets {
     public class SheetData<T> : SheetData {
         public T[] data;
         public override Type RowType => typeof(T);
-        internal override void UpdateData(object[] rows) {
+        public override void UpdateData(object[] rows) {
             this.data = rows.Cast<T>().ToArray();
             OnDataUpdate();
         }
@@ -23,30 +24,120 @@ namespace Mobge.Sheets {
     public abstract class SheetData : ScriptableObject {
         public GoogleSheet googleSheet;
         public CellId tableStart;
-        [Disabled, SerializeField, SerializeReference] public Mapping[] mappings;
+        public MappingEntry[] mappings;
         public abstract Type RowType { get; }
-        internal abstract void UpdateData(object[] rows);
+        public abstract void UpdateData(object[] rows);
 
+
+        [Serializable]
+        public struct MappingEntry {
+            public string fieldName;
+            [SerializeReference] public AMapping mapping;
+            public bool IsValid => mapping != null;
+        }
+
+        public abstract class AMapping {
+            public abstract void GetAllKeys(List<string> keys);
+            public abstract object GetObjectRaw(string key);
+        }
         
         [Serializable]
-        public abstract class Mapping {
-            public string fieldName;
-            public abstract object GetObject(string key);
-        }
-        [Serializable]
-        public class DefaultMapping : Mapping {
-            public object defaultValue;
-            public Pair[] pairs;
-
-            public override object GetObject(string key) {
-                // implement over pairs
-                throw new NotImplementedException();
+        public abstract class AMapping<T> : AMapping {
+            public abstract T GetObject(string key);
+            public override object GetObjectRaw(string key) {
+                return GetObject(key);
             }
         }
         [Serializable]
-        public struct Pair {
-            public string key;
-            [SerializeReference] public object value;
+        public class PairMapping<T> : AMapping<T> {
+            public T defaultValue;
+            public Pair[] pairs;
+            public override T GetObject(string key) {
+                int count = pairs.GetLength();
+                for(int i = 0; i < count; i++) {
+                    var p = pairs[i];
+                    if(p.Key == key) {
+                        return p.value;
+                    }
+                }
+                return defaultValue;
+            }
+            public override void GetAllKeys(List<string> keys) {
+                int count = pairs.GetLength();
+                for(int i = 0; i < count; i++) {
+                    keys.Add(pairs[i].Key);
+                }
+            }
+            [Serializable]
+            public struct Pair {
+                public string key;
+                public T value;
+                public string Key {
+                    get {
+                        if(!string.IsNullOrEmpty(key)) {
+                            return key;
+                        }
+                        if(value is UnityEngine.Object o) {
+                            return o.name;
+                        }
+                        return "" + value;
+                    }
+                }
+            }
+        }
+        [Serializable]
+        public class SpriteMapping : PairMapping<Sprite> {
+
+        }
+        [Serializable]
+        public class ObjectMapping : PairMapping<UnityEngine.Object> {
+
+        }
+        [Serializable]
+        public class ItemMapping : AMapping<ItemSet.ItemPath> {
+            public ItemSet.ItemPath defaultValue;
+            public static char[] s_trimChars = new char[]{' ', '\r', '\n'};
+            public ItemSet[] sets;
+            public override ItemSet.ItemPath GetObject(string key) {
+                var values = key.Split(':');
+                if(values.Length == 0) {
+                    return defaultValue;
+                }
+                string setName = null;
+                string itemName = values[0];
+                if(values.Length >= 2) {
+                    setName = values[0];
+                    setName = setName.Trim(s_trimChars);
+                    itemName = values[1];
+
+                }
+                itemName = itemName.Trim(s_trimChars);
+                for(int i = 0; i < sets.Length; i++) {
+                    var set = sets[i];
+                    if(set == null || (!string.IsNullOrEmpty(setName) && setName != set.name)) {
+                        continue;
+                    }
+                    
+                    foreach(var pp in set.items) {
+                        if(pp.Value.name == itemName) {
+                            return new ItemSet.ItemPath(set, pp.Key);
+                        }
+                    }
+                }
+                return defaultValue;
+            }
+            public override void GetAllKeys(List<string> keys) {
+                int count = sets.GetLength();
+                for(int i = 0; i < count; i++) {
+                    var set = sets[i];
+                    if(set == null){
+                        continue;
+                    }
+                    foreach(var item in set.items) {
+                        keys.Add(set.name + ":" + item.Value.name);
+                    }
+                }
+            }
         }
     }
     [Serializable]
