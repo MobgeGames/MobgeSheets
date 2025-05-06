@@ -80,6 +80,13 @@ namespace Mobge.Sheets {
                         var mapping = mappings[iField];
                         if(mapping != null) {
                             value = mapping.GetObjectRaw(cellNode.Value);
+                            //Debug.Log($"value validated: {mapping}, {value} : {mapping.ValidateValue(value)}");
+                            if(!mapping.ValidateValue(value)) {
+                                var ts = _go.tableStart;
+                                ts.column = CellId.Add(ts.column, columnIndex);
+                                ts.row += i + 1;
+                                report.AppendLine($"Mapping error at cell: {ts.column}:{ts.row}");
+                            }
                         }
                     }
                     field.SetValue(rowData, value);
@@ -116,7 +123,7 @@ namespace Mobge.Sheets {
             return value;
         }
 
-        private async Task<int2> DetectSize() {
+        private async Task<int2>DetectSize() {
             var start = _go.tableStart;
             if(string.IsNullOrEmpty(start.column)) {
                 start.column = "A";
@@ -152,6 +159,107 @@ namespace Mobge.Sheets {
 
 
             return size;
+        }
+
+        private void UpdateSheetField(EditorFoldGroups.Group g) {
+            g.AddChild("Update Sheet", () => {
+                EditorGUILayout.BeginHorizontal();
+                string rowCountKey = "Row Count";
+                int rowCount = _groups.IntField(rowCountKey, 1);
+                if(rowCount < 1) {
+                    rowCount = 1;
+                    _groups.SetObject(rowCountKey, rowCount);
+                }
+                if(GUILayout.Button("Create Template")) {
+                    TryCreateTemplate(rowCount);
+                }
+                if(GUILayout.Button("Update Dropdowns")) {
+                    TryUpdateDropdowns();
+                }
+                EditorGUILayout.EndHorizontal();
+            });
+        }
+        private async void TryCreateTemplate(int rowCount) {
+            if(!BinarySerializer.TryGetFields(_go.RowType, out var fields)) {
+                Debug.LogError("Data Has no serializable fields.");
+                return;
+            }
+            int2 size = new int2(fields.Length, rowCount + 1);
+            string range = _go.tableStart.GetRange(size);
+            var values = await _go.googleSheet.GetValues(Dimension.ROWS, range);
+            if(values == null || values.Length == 0) {
+                Debug.LogError("Failed to access sheet.");
+                return;
+            }
+            if(values[0].AsArray.Count > 0) {
+                Debug.LogError("There is no enough empty space in sheet.");
+                return;
+            }
+            JSONArray root = new JSONArray();
+            JSONArray row = new JSONArray();
+            for(int i = 0; i < fields.Length; i++) {
+                row.Add(fields[i].Name);
+            }
+            root[0] = row;
+            await _go.googleSheet.PutValues(Dimension.ROWS, root, range);
+            TryUpdateDropdowns(rowCount);
+        }
+        private async void TryUpdateDropdowns() {
+            int2 size = await this.DetectSize();
+            if(size.y < 2) {
+                Debug.LogError("Table has no rows.");
+                return;
+            }
+            TryUpdateDropdowns(size.y - 1);
+
+        }
+        private async void TryUpdateDropdowns(int rowCount) {
+            if(_go.mappings.IsNullOrEmpty()) {
+                Debug.LogError("No mapping defined.");
+                return;
+            }
+            CellId start = _go.tableStart;
+            string headerRange = start.column + start.row + ":" + start.row;
+            var jHeaderValues = (await _go.googleSheet.GetValues(Dimension.ROWS, headerRange))[0];
+            if(jHeaderValues.Count == 0) {
+                Debug.LogError("Header row is not found.");
+                return;
+            }
+            var jHeaderRow = jHeaderValues[0];
+            List<GoogleSheet.DropDownData> d = new();
+            List<string> allKeys = new();
+            for(int i = 0; i < _go.mappings.Length; i++) {
+                int columnOffset = -1;
+                var mapping = _go.mappings[i];
+                for(int j = 0; j < jHeaderRow.Count; j++) {
+                    if(jHeaderRow[j].Value == mapping.fieldName) {
+                        columnOffset = j;
+                        break;
+                    }
+                }
+                if(columnOffset == -1) {
+                    Debug.LogError($"Column {mapping.fieldName} is not found.");
+                    continue;
+                }
+                allKeys.Clear();
+                mapping.mapping.GetAllKeys(allKeys);
+                if(allKeys.Count == 0) {
+                    Debug.LogError($"Mapping {mapping.fieldName} is not configured.");
+                    continue;
+                }
+                GoogleSheet.DropDownData dd;
+                dd.options = allKeys.ToArray();
+                dd.start = start.ZeroBasedIndex;
+                dd.start.x += columnOffset;
+                dd.start.y += 1;
+                dd.size = new int2(1, rowCount);
+                d.Add(dd);
+            }
+            if(d.Count == 0) {
+                Debug.LogError("No dropdown configured.");
+                return;
+            }
+            await _go.googleSheet.SetDropDowns(d.ToArray());
         }
     }
 }

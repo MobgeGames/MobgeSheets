@@ -7,6 +7,8 @@ using Mobge.Serialization;
 using SerializeReferenceEditor.Editor;
 using SerializeReferenceEditor;
 using System.Text;
+using Mono.Cecil;
+using System.IO;
 
 namespace Mobge.Sheets {
     [CustomPropertyDrawer(typeof(CellId))]
@@ -27,6 +29,27 @@ namespace Mobge.Sheets {
     }
     [CustomEditor(typeof(SheetData), true)]
     public partial class ESheetData : Editor {
+        public const string c_defaultSettingsPath = "Assets/Editor/Resources/" + GoogleSheetCredentials.c_defaultAssetName + ".asset";
+
+        [MenuItem("Window/Mobge/Google Sheet Settings")]
+        public static void SheetSettings() {
+            var a = AssetDatabase.LoadAssetAtPath<GoogleSheetCredentials>(c_defaultSettingsPath);
+            if(a == null) {
+                string path = c_defaultSettingsPath;
+                var paths = path.Split("/");
+                string parent = paths[0];
+                for(int i = 1; i < paths.Length - 1; i++) {
+                    AssetDatabase.CreateFolder(parent, paths[i]);
+                    parent += "/" + paths[i];
+                }
+                var ins = ScriptableObject.CreateInstance<GoogleSheetCredentials>();
+                AssetDatabase.CreateAsset(ins, c_defaultSettingsPath);
+                AssetDatabase.SaveAssets();
+                AssetDatabase.Refresh();
+                a = AssetDatabase.LoadAssetAtPath<GoogleSheetCredentials>(c_defaultSettingsPath);
+            }
+            Selection.activeObject = a;
+        }
         private SheetData _go;
 
         private SRDrawer _srDrawer;
@@ -63,7 +86,10 @@ namespace Mobge.Sheets {
         }
 
         public override void OnInspectorGUI() {
-            
+            if(string.IsNullOrEmpty(_go.tableStart.column)) {
+                _go.tableStart.column = "A";
+            }
+            _go.tableStart.row = Mathf.Max(1, _go.tableStart.row);
             serializedObject.Update();
             
             Undo.RecordObject(_go, "sheet data edit");
@@ -81,6 +107,7 @@ namespace Mobge.Sheets {
            
             
             MappingsEditor();
+            _groups.GuilayoutField(CreateGroups);
             if(GUILayout.Button("Update From Sheet")) {
                 UpdateFromSheet();
             }
@@ -91,6 +118,11 @@ namespace Mobge.Sheets {
                 EditorExtensions.SetDirty(_go);
             }
         }
+
+        private void CreateGroups(EditorFoldGroups.Group group) {
+            UpdateSheetField(group);
+        }
+
         private void MappingsEditor() {
             var pMappings = FindProperty(nameof(SheetData.mappings));
             pMappings.isExpanded = EditorGUILayout.Foldout(pMappings.isExpanded, "Columns", true);

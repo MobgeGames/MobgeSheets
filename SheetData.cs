@@ -39,11 +39,24 @@ namespace Mobge.Sheets {
         public abstract class AMapping {
             public abstract void GetAllKeys(List<string> keys);
             public abstract object GetObjectRaw(string key);
+            public abstract bool ValidateValue(object value);
         }
         
         [Serializable]
         public abstract class AMapping<T> : AMapping {
             public abstract T GetObject(string key);
+            public override bool ValidateValue(object value) {
+                if(value is T t) {
+                    return ValidateValueT(t);
+                }
+                return false;
+            }
+            public virtual bool ValidateValueT(T value) {
+                if(value is UnityEngine.Object uo) {
+                    return uo != null;
+                }
+                return value != null;
+            }
             public override object GetObjectRaw(string key) {
                 return GetObject(key);
             }
@@ -98,6 +111,10 @@ namespace Mobge.Sheets {
             public ItemSet.ItemPath defaultValue;
             public static char[] s_trimChars = new char[]{' ', '\r', '\n'};
             public ItemSet[] sets;
+            public bool preferShortForm = true;
+            public override bool ValidateValueT(ItemSet.ItemPath value) {
+                return value.IsValid;
+            }
             public override ItemSet.ItemPath GetObject(string key) {
                 var values = key.Split(':');
                 if(values.Length == 0) {
@@ -134,7 +151,12 @@ namespace Mobge.Sheets {
                         continue;
                     }
                     foreach(var item in set.items) {
-                        keys.Add(set.name + ":" + item.Value.name);
+                        if(preferShortForm) {
+                            keys.Add(item.Value.name);
+                        }
+                        else {
+                            keys.Add(set.name + ": " + item.Value.name);
+                        }
                     }
                 }
             }
@@ -146,6 +168,14 @@ namespace Mobge.Sheets {
         public const int c_charCount = 26; 
         public string column;
         public int row;
+        public int2 ZeroBasedIndex {
+            get {
+                int2 i;
+                i.x = ColumnToIndex(column) - 1;
+                i.y = row - 1;
+                return i;
+            }
+        }
         public static int ColumnToIndex(string column) {
             int val = 0;
             for(int i = 0; i < column.Length; i++) {

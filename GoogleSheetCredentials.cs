@@ -1,26 +1,35 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
-using UnityEditor;
+using System.Net.Http;
 using UnityEngine;
 
 namespace Mobge.Sheets {
     public class GoogleSheetCredentials : ScriptableObject {
+        public const string c_defaultAssetName = "GoogleSheetConfiguration";
         private static GoogleSheetCredentials _instance;
         public static GoogleSheetCredentials Instance {
             get {
                 if(_instance == null) {
-                    _instance = Resources.Load<GoogleSheetCredentials>("GoogleSheetSettings");
+                    _instance = Resources.Load<GoogleSheetCredentials>(c_defaultAssetName);
                 }
                 return _instance;
             }
         }
-        // public string clientId;
-        // public string clientSecret;
-        // private string _accessToken;
-        // private string _expirationData;
-        // public async void EnsureAccessToken() {
+        public static byte[] AccessGrantedPageContent {
+            get {
+                return Resources.Load<TextAsset>("GoogleAccessGrantedPage").bytes;
+            }
+        }
+        public string[] scopes = {
+            "https://www.googleapis.com/auth/drive",
+	        "https://www.googleapis.com/auth/drive.file",
+	        "https://www.googleapis.com/auth/spreadsheets"
+        };
+        public string clientId;
+        public string clientSecret;
+        [SerializeField] private string apiKey;
+        
 
-        // }
-        public string apiKey = "AIzaSyDcC2LaOt2HBb8wND1vuU9S37v9skfc2Ng";
     }
 }
