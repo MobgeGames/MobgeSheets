@@ -73,16 +73,7 @@ namespace Mobge.Sheets {
         }
 
         private SerializedProperty FindProperty(string name) {
-            var root = serializedObject.GetIterator();
-            root.Reset();
-            root.NextVisible(true);
-            do {
-                if(root.propertyPath == name) {
-                    return root;
-                }
-            }
-            while(root.NextVisible(false));
-            return default;
+            return serializedObject.FindProperty(name);
         }
 
         public override void OnInspectorGUI() {
