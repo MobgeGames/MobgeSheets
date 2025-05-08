@@ -12,21 +12,22 @@ using UnityEngine;
 
 namespace Mobge.Sheets {
     public partial class ESheetData {
-         private async void UpdateFromSheet() {
-            int2 size = await DetectSize();
-            var range = _go.tableStart.GetRange(size);
-            await ReadFromSheet(range);
+         private async void UpdateFromSheet(SerializedProperty p) {
+            var go = p.ReadObject<SheetData>(out var t);
+            int2 size = await DetectSize(go);
+            var range = go.tableStart.GetRange(size);
+            await ReadFromSheet(p, go, range);
         }
 
-        private async Task ReadFromSheet(string range) {
-            var result = await _go.googleSheet.GetValues(Dimension.ROWS, range);
+        private async Task ReadFromSheet(SerializedProperty p, SheetData go, string range) {
+            var result = await go.googleSheet.GetValues(Dimension.ROWS, range);
             var nodes = result[0];
             int rowCount = nodes.Count - 1;
             var header = nodes[0];
             StringBuilder report = new();
-            report.Append("Updating Sheet: " + _go.name);
+            report.Append("Updating Sheet: " + go.googleSheet.sheetName);
             report.AppendLine(" Data count: " + rowCount);
-            BinarySerializer.TryGetFields(_go.RowType, out var fields);
+            BinarySerializer.TryGetFields(go.RowType, out var fields);
             int fieldCount = fields.GetLength();
             int[] columnIndexes = new int[fieldCount];
             SheetData.AMapping[] mappings = new SheetData.AMapping[fieldCount];
@@ -46,10 +47,10 @@ namespace Mobge.Sheets {
                 }
 
                 if(!IsPrimitive(field.FieldType)) {
-                    int mappingCount = _go.mappings.GetLength();
+                    int mappingCount = go.mappings.GetLength();
                     SheetData.AMapping selectedMapping = default;
                     for(int im = 0; im < mappingCount; im++) {
-                        var mapping = _go.mappings[im];
+                        var mapping = go.mappings[im];
                         if(mapping.fieldName == field.Name) {
                             selectedMapping = mapping.mapping;
                             break;
@@ -64,7 +65,7 @@ namespace Mobge.Sheets {
             object[] data = new object[rowCount];
             for(int i = 0; i < rowCount; i++) {
                 var rowCells = nodes[i + 1].AsArray;
-                object rowData = Activator.CreateInstance(_go.RowType);
+                object rowData = Activator.CreateInstance(go.RowType);
                 for(int iField = 0; iField < fieldCount; iField++) {
                     int columnIndex = columnIndexes[iField];
                     if(columnIndex < 0) {
@@ -82,7 +83,7 @@ namespace Mobge.Sheets {
                             value = mapping.GetObjectRaw(cellNode.Value);
                             //Debug.Log($"value validated: {mapping}, {value} : {mapping.ValidateValue(value)}");
                             if(!mapping.ValidateValue(value)) {
-                                var ts = _go.tableStart;
+                                var ts = go.tableStart;
                                 ts.column = CellId.Add(ts.column, columnIndex);
                                 ts.row += i + 1;
                                 report.AppendLine($"Mapping error at cell: {ts.column}:{ts.row}");
@@ -93,9 +94,11 @@ namespace Mobge.Sheets {
                 }
                 data[i] = rowData;
             }
-            Undo.RecordObject(_go, "Update data from sheet");
-            _go.UpdateData(data);
-            EditorExtensions.SetDirty(_go);
+            Undo.RecordObject(p.serializedObject.targetObject, "Update data from sheet");
+            go.UpdateData(data);
+            p.WriteObject(go);
+            p.serializedObject.ApplyModifiedProperties();
+            EditorExtensions.SetDirty(p.serializedObject.targetObject);
             Debug.Log(report);
             
         }
@@ -123,8 +126,8 @@ namespace Mobge.Sheets {
             return value;
         }
 
-        private async Task<int2>DetectSize() {
-            var start = _go.tableStart;
+        private async Task<int2>DetectSize(SheetData go) {
+            var start = go.tableStart;
             if(string.IsNullOrEmpty(start.column)) {
                 start.column = "A";
             }
@@ -133,7 +136,7 @@ namespace Mobge.Sheets {
             }
             string rangeH = start.column + start.row + ':' + start.row;
             string rangeV = start.column + start.row + ':' + start.column;
-            var nodes = await _go.googleSheet.GetValues(Dimension.ROWS, rangeH, rangeV);
+            var nodes = await go.googleSheet.GetValues(Dimension.ROWS, rangeH, rangeV);
             if(nodes.IsNullOrEmpty()) {
                 return default;
             }
@@ -161,25 +164,26 @@ namespace Mobge.Sheets {
             return size;
         }
 
-        private void UpdateSheetField(EditorFoldGroups.Group g) {
-            g.AddChild("Update Sheet", () => {
-                EditorGUILayout.BeginHorizontal();
-                string rowCountKey = "Row Count";
-                int rowCount = _groups.IntField(rowCountKey, 1);
-                if(rowCount < 1) {
-                    rowCount = 1;
-                    _groups.SetObject(rowCountKey, rowCount);
+        private void UpdateSheetField(Meta meta, SerializedProperty p) {
+            meta.updateFieldOpen = EditorGUI.Foldout(s_layout.NextRect(), meta.updateFieldOpen, "Update Sheet", true);
+            if(meta.updateFieldOpen) {
+                EditorGUI.indentLevel++;
+                var rect = s_layout.NextSplitRect(s_layout.Width * 0.5f, out var rCount, out var rButtons, 5);
+                LayoutRectSource.SplitRect(rButtons, rButtons.width * 0.5f, out var rCreate, out var rDropdowns);
+                meta.rowCount = EditorGUI.IntField(rCount, "Row Count", meta.rowCount);
+                if(GUI.Button(rCreate, "Create Template")) {
+                    TryCreateTemplate(p, meta.rowCount);
                 }
-                if(GUILayout.Button("Create Template")) {
-                    TryCreateTemplate(rowCount);
+                if(GUI.Button(rDropdowns, "Update Dropdowns")) {
+                    var _go = p.ReadObject<SheetData>(out _);
+                    TryUpdateDropdowns(_go);
                 }
-                if(GUILayout.Button("Update Dropdowns")) {
-                    TryUpdateDropdowns();
-                }
-                EditorGUILayout.EndHorizontal();
-            });
+                EditorGUI.indentLevel--;
+            }
+            
         }
-        private async void TryCreateTemplate(int rowCount) {
+        private async void TryCreateTemplate(SerializedProperty p, int rowCount) {
+            var _go = p.ReadObject<SheetData>(out _);
             if(!BinarySerializer.TryGetFields(_go.RowType, out var fields)) {
                 Debug.LogError("Data Has no serializable fields.");
                 return;
@@ -202,18 +206,18 @@ namespace Mobge.Sheets {
             }
             root[0] = row;
             await _go.googleSheet.PutValues(Dimension.ROWS, root, range);
-            TryUpdateDropdowns(rowCount);
+            TryUpdateDropdowns(_go, rowCount);
         }
-        private async void TryUpdateDropdowns() {
-            int2 size = await this.DetectSize();
+        private async void TryUpdateDropdowns(SheetData go) {
+            int2 size = await this.DetectSize(go);
             if(size.y < 2) {
                 Debug.LogError("Table has no rows.");
                 return;
             }
-            TryUpdateDropdowns(size.y - 1);
+            TryUpdateDropdowns(go, size.y - 1);
 
         }
-        private async void TryUpdateDropdowns(int rowCount) {
+        private async void TryUpdateDropdowns(SheetData _go, int rowCount) {
             if(_go.mappings.IsNullOrEmpty()) {
                 Debug.LogError("No mapping defined.");
                 return;

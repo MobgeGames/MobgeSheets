@@ -9,19 +9,24 @@ using UnityEngine;
 using UnityEngine.Networking;
 
 namespace Mobge.Sheets {
-	[CreateAssetMenu(menuName = "Mobge/Sheets/Data")]
-    public class SheetData<T> : SheetData {
+	//[CreateAssetMenu(menuName = "Mobge/Sheets/Data")]
+    [Serializable]
+    public sealed class SheetData<T> : SheetData {
         public T[] data;
         public override Type RowType => typeof(T);
         public override void UpdateData(object[] rows) {
             this.data = rows.Cast<T>().ToArray();
-            OnDataUpdate();
+            //OnDataUpdate();
         }
-        protected virtual void OnDataUpdate() {
+        public int Count => data.Length;
+        public T this[int index] {
+            get => data[index];
+        }
+        // protected virtual void OnDataUpdate() {
 
-        }
+        // }
     }
-    public abstract class SheetData : ScriptableObject {
+    public abstract class SheetData {
         public GoogleSheet googleSheet;
         public CellId tableStart;
         public MappingEntry[] mappings;

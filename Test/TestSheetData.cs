@@ -4,9 +4,10 @@ using System.Collections.Generic;
 using UnityEngine;
 
 namespace Mobge.Sheets.Test {
-    public class TestSheetData : SheetData<TestSheetData.Row> {
+    public class TestSheetData : ScriptableObject {
+        public SheetData<Character> characters;
         [Serializable]
-        public struct Row {
+        public struct Character {
             public string name;
             public int score;
             public Sprite icon;
