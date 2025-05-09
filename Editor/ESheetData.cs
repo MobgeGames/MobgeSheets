@@ -87,7 +87,9 @@ namespace Mobge.Sheets {
             }
             var meta = GetMeta(property);
             s_layout.Reset(position);
-            EditorGUI.PropertyField(s_layout.NextRect(), property);
+            var rHeader = s_layout.NextRect();
+            UpdateDataButton(rHeader, property);
+            EditorGUI.PropertyField(rHeader, property);
             if(!property.isExpanded) {
                 meta.height = s_layout.Height;
                 return;
@@ -97,14 +99,22 @@ namespace Mobge.Sheets {
             PropertyField(property, nameof(SheetData.tableStart));
             MappingsEditor(property, go.RowType);
             UpdateSheetField(meta, property);
-            if(GUI.Button(s_layout.NextRect(), "Update From Sheet")) {
-                UpdateFromSheet(property);
-            }
+            
             PropertyField(property, nameof(SheetData<int>.data));
             EditorGUI.indentLevel--;
             meta.height = s_layout.Height;
             return;
         }
+
+        private void UpdateDataButton(Rect rHeader, SerializedProperty property) {
+            var gc = new GUIContent("Update Data");
+            float buttonWidth = 10f + GUI.skin.button.CalcSize(gc).x;
+            Rect buttonRect = new Rect(rHeader.x + rHeader.width - buttonWidth, rHeader.y, buttonWidth, rHeader.height);
+            if(GUI.Button(buttonRect, gc)) {
+                UpdateFromSheet(property);
+            }
+        }
+
         public override float GetPropertyHeight(SerializedProperty property, GUIContent label) {
             return GetMeta(property).height;
         }

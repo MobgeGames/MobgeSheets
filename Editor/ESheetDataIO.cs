@@ -25,7 +25,12 @@ namespace Mobge.Sheets {
             int rowCount = nodes.Count - 1;
             var header = nodes[0];
             StringBuilder report = new();
-            report.Append("Updating Sheet: " + go.googleSheet.sheetName);
+            report.Append("Updating Sheet: (");
+            report.Append(p.serializedObject.targetObject.name);
+            report.Append(", ");
+            report.Append(p.propertyPath);
+            report.Append(")");
+
             report.AppendLine(" Data count: " + rowCount);
             BinarySerializer.TryGetFields(go.RowType, out var fields);
             int fieldCount = fields.GetLength();
@@ -99,7 +104,7 @@ namespace Mobge.Sheets {
             p.WriteObject(go);
             p.serializedObject.ApplyModifiedProperties();
             EditorExtensions.SetDirty(p.serializedObject.targetObject);
-            Debug.Log(report);
+            Debug.Log(report, p.serializedObject.targetObject);
             
         }
 
@@ -168,9 +173,10 @@ namespace Mobge.Sheets {
             meta.updateFieldOpen = EditorGUI.Foldout(s_layout.NextRect(), meta.updateFieldOpen, "Update Sheet", true);
             if(meta.updateFieldOpen) {
                 EditorGUI.indentLevel++;
-                var rect = s_layout.NextSplitRect(s_layout.Width * 0.5f, out var rCount, out var rButtons, 5);
+                s_layout.NextSplitRect(s_layout.Width * 0.5f, out var rCount, out var rButtons, 5);
                 LayoutRectSource.SplitRect(rButtons, rButtons.width * 0.5f, out var rCreate, out var rDropdowns);
                 meta.rowCount = EditorGUI.IntField(rCount, "Row Count", meta.rowCount);
+                meta.rowCount = Mathf.Max(meta.rowCount, 1);
                 if(GUI.Button(rCreate, "Create Template")) {
                     TryCreateTemplate(p, meta.rowCount);
                 }
@@ -184,7 +190,7 @@ namespace Mobge.Sheets {
         }
         private async void TryCreateTemplate(SerializedProperty p, int rowCount) {
             var _go = p.ReadObject<SheetData>(out _);
-            if(!BinarySerializer.TryGetFields(_go.RowType, out var fields)) {
+            if(!BinarySerializationBase.TryGetFields(_go.RowType, out var fields)) {
                 Debug.LogError("Data Has no serializable fields.");
                 return;
             }
