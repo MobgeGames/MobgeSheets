@@ -7,8 +7,6 @@ using Mobge.Serialization;
 using SerializeReferenceEditor.Editor;
 using SerializeReferenceEditor;
 using System.Text;
-using Mono.Cecil;
-using System.IO;
 
 namespace Mobge.Sheets {
     [CustomPropertyDrawer(typeof(CellId))]
