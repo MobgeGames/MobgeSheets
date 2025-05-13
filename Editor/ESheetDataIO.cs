@@ -24,15 +24,17 @@ namespace Mobge.Sheets {
             var nodes = result[0];
             int rowCount = nodes.Count - 1;
             var header = nodes[0];
-            StringBuilder report = new();
-            report.Append("Updating Sheet: (");
-            report.Append(p.serializedObject.targetObject.name);
-            report.Append(", ");
-            report.Append(p.propertyPath);
-            report.Append(")");
+            ReadCellContext ctx;
+            ctx.sheetData = go;
+            ctx.report = new();
+            ctx.report.Append("Updating Sheet: (");
+            ctx.report.Append(p.serializedObject.targetObject.name);
+            ctx.report.Append(", ");
+            ctx.report.Append(p.propertyPath);
+            ctx.report.Append(")");
 
-            report.AppendLine(" Data count: " + rowCount);
-            BinarySerializer.TryGetFields(go.RowType, out var fields);
+            ctx.report.AppendLine(" Data count: " + rowCount);
+            SheetData.TryGetFields(go.RowType, out var fields);
             int fieldCount = fields.GetLength();
             int[] columnIndexes = new int[fieldCount];
             SheetData.AMapping[] mappings = new SheetData.AMapping[fieldCount];
@@ -48,10 +50,10 @@ namespace Mobge.Sheets {
                 }
                 columnIndexes[i] = selectedIndex;
                 if(selectedIndex < 0) {
-                    report.AppendLine("No column found for field: " + field.Name);
+                    ctx.report.AppendLine("No column found for field: " + field.Name);
                 }
 
-                if(!IsPrimitive(field.FieldType)) {
+                if(!IsPrimitive(field.type)) {
                     int mappingCount = go.mappings.GetLength();
                     SheetData.AMapping selectedMapping = default;
                     for(int im = 0; im < mappingCount; im++) {
@@ -63,7 +65,7 @@ namespace Mobge.Sheets {
                     }
                     mappings[i] = selectedMapping;
                     if(selectedMapping == null) {
-                        report.AppendLine("No mapping found for column: " + field.Name);
+                        ctx.report.AppendLine("No mapping found for column: " + field.Name);
                     }
                 }
             }
@@ -72,30 +74,28 @@ namespace Mobge.Sheets {
                 var rowCells = nodes[i + 1].AsArray;
                 object rowData = Activator.CreateInstance(go.RowType);
                 for(int iField = 0; iField < fieldCount; iField++) {
-                    int columnIndex = columnIndexes[iField];
-                    if(columnIndex < 0) {
+                    ctx.columnIndex = columnIndexes[iField];
+                    if(ctx.columnIndex < 0) {
                         continue;
                     }
+                    ctx.rowIndex = i;
                     var field = fields[iField];
-                    var cellNode = rowCells[columnIndex];
+                    var textValue = rowCells[ctx.columnIndex].Value;
                     object value = default;
-                    if(IsPrimitive(field.FieldType)) {
-                        value = GetPrimitiveValue(ref rowData, cellNode, field.FieldType);
+                    if(field.isArray) {
+                        var values = textValue.Split(',');
+                        var arr = Array.CreateInstance(field.type, values.Length);
+                        for(int v = 0; v < values.Length; v++) {
+                            string arrValue = values[v];
+                            var o = ConvertToObject(arrValue, field, mappings[iField], ctx);
+                            arr.SetValue(o, v);
+                        }
+                        value = arr;
                     }
                     else {
-                        var mapping = mappings[iField];
-                        if(mapping != null) {
-                            value = mapping.GetObjectRaw(cellNode.Value);
-                            //Debug.Log($"value validated: {mapping}, {value} : {mapping.ValidateValue(value)}");
-                            if(!mapping.ValidateValue(value)) {
-                                var ts = go.tableStart;
-                                ts.column = CellId.Add(ts.column, columnIndex);
-                                ts.row += i + 1;
-                                report.AppendLine($"Mapping error at cell: {ts.column}:{ts.row}");
-                            }
-                        }
+                        value = ConvertToObject(textValue, field, mappings[iField], ctx);
                     }
-                    field.SetValue(rowData, value);
+                    field.fieldInfo.SetValue(rowData, value);
                 }
                 data[i] = rowData;
             }
@@ -104,29 +104,54 @@ namespace Mobge.Sheets {
             p.WriteObject(go);
             p.serializedObject.ApplyModifiedProperties();
             EditorExtensions.SetDirty(p.serializedObject.targetObject);
-            Debug.Log(report, p.serializedObject.targetObject);
+            Debug.Log(ctx.report, p.serializedObject.targetObject);
             
         }
+        private object ConvertToObject(string textValue, SheetData.Field field, SheetData.AMapping mapping, in ReadCellContext ctx) {
+            textValue = textValue.Trim(SheetData.s_trimChars);
+            object value = null;
+            if(IsPrimitive(field.type)) {
+                value = GetPrimitiveValue(textValue, field.type);
+            }
+            else {
+                if(mapping != null) {
+                    value = mapping.GetObjectRaw(textValue);
+                    //Debug.Log($"value validated: {mapping}, {value} : {mapping.ValidateValue(value)}");
+                    if(!mapping.ValidateValue(value)) {
+                        var ts = ctx.sheetData.tableStart;
+                        ts.column = CellId.Add(ts.column, ctx.columnIndex);
+                        ts.row += ctx.rowIndex + 1;
+                        ctx.report.AppendLine($"Mapping error at cell: {ts.column}:{ts.row}");
+                    }
+                }
+            }
+            return value;
+        }
 
-        private object GetPrimitiveValue(ref object rowData, JSONNode cellNode, Type t) {
+        private object GetPrimitiveValue(string textValue, Type t) {
             object value = null;
             if(t == typeof(int)) {
-                value = cellNode.AsInt;
+                int.TryParse(textValue, out int i);
+                value = i;
             }
             else if(t == typeof(string)) {
-                value = cellNode.Value;
+                value = textValue;
             }
             else if(t == typeof(bool)) {
-                value = cellNode.AsBool;
+                bool.TryParse(textValue, out bool i);
+                value = i;
             }
             else if(t == typeof(float)) {
-                value = cellNode.AsFloat;
+                float.TryParse(textValue, out float i);
+                value = i;
             }
             else if(t == typeof(long)) {
-                value = cellNode.AsInt;
+                long.TryParse(textValue, out long i);
+                value = i;
             }
             else if(t == typeof(double)) {
-                value = cellNode.AsDouble;
+                double.TryParse(textValue, out double i);
+                value = i;
             }
             return value;
         }
@@ -190,7 +215,7 @@ namespace Mobge.Sheets {
         }
         private async void TryCreateTemplate(SerializedProperty p, int rowCount) {
             var _go = p.ReadObject<SheetData>(out _);
-            if(!BinarySerializationBase.TryGetFields(_go.RowType, out var fields)) {
+            if(!SheetData.TryGetFields(_go.RowType, out var fields)) {
                 Debug.LogError("Data Has no serializable fields.");
                 return;
             }
@@ -238,6 +263,7 @@ namespace Mobge.Sheets {
             var jHeaderRow = jHeaderValues[0];
             List<GoogleSheet.DropDownData> d = new();
             List<string> allKeys = new();
+            SheetData.TryGetFields(_go.RowType, out var fields);
             for(int i = 0; i < _go.mappings.Length; i++) {
                 int columnOffset = -1;
                 var mapping = _go.mappings[i];
@@ -263,6 +289,14 @@ namespace Mobge.Sheets {
                 dd.start.x += columnOffset;
                 dd.start.y += 1;
                 dd.size = new int2(1, rowCount);
+                dd.multiSelect = false;
+                if(fields != null) {
+                    for(int f = 0; f < fields.Length; f++) {
+                        if(fields[f].Name == mapping.fieldName) {
+                            dd.multiSelect = fields[f].isArray;
+                        }
+                    }
+                }
                 d.Add(dd);
             }
             if(d.Count == 0) {
@@ -270,6 +304,13 @@ namespace Mobge.Sheets {
                 return;
             }
             await _go.googleSheet.SetDropDowns(d.ToArray());
+        }
+        private struct ReadCellContext {
+            public StringBuilder report;
+            public int columnIndex;
+            public int rowIndex;
+            public SheetData sheetData;
+
         }
     }
 }

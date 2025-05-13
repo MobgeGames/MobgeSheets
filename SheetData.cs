@@ -2,6 +2,8 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
+using Mobge.Serialization;
 using SerializeReferenceEditor;
 using Sirenix.OdinInspector;
 using Unity.Mathematics;
@@ -27,11 +29,13 @@ namespace Mobge.Sheets {
         // }
     }
     public abstract class SheetData {
+        public static char[] s_trimChars = new char[]{' ', '\r', '\n'};
         public GoogleSheet googleSheet;
         public CellId tableStart;
         public MappingEntry[] mappings;
         public abstract Type RowType { get; }
         public abstract void UpdateData(object[] rows);
+
 
 
         [Serializable]
@@ -103,6 +107,34 @@ namespace Mobge.Sheets {
                 }
             }
         }
+        public static bool TryGetFields(Type type, out Field[] fields) {
+            if(!BinarySerializer.TryGetFields(type, out var ffs)) {
+                fields = null;
+                return false;
+            }
+            fields = new Field[ffs.Length];
+            for(int i = 0; i < ffs.Length; i++) {
+                fields[i] = new Field(ffs[i]);
+            }
+            return true;
+        }
+        public struct Field {
+            public Type type;
+            public FieldInfo fieldInfo;
+            public bool isArray;
+            public string Name => fieldInfo.Name;
+            public Field(FieldInfo f) {
+                this.fieldInfo = f;
+                var t = f.FieldType;
+                isArray = t.IsArray;
+                if(isArray) {
+                    type = t.GetElementType();
+                }
+                else {
+                    type = t;
+                }
+            }
+        }
         [Serializable]
         public class SpriteMapping : PairMapping<Sprite> {
 
@@ -114,7 +146,6 @@ namespace Mobge.Sheets {
         [Serializable]
         public class ItemMapping : AMapping<ItemSet.ItemPath> {
             public ItemSet.ItemPath defaultValue;
-            public static char[] s_trimChars = new char[]{' ', '\r', '\n'};
             public ItemSet[] sets;
             public bool preferShortForm = true;
             public override bool ValidateValueT(ItemSet.ItemPath value) {

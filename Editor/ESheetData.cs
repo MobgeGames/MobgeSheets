@@ -256,14 +256,14 @@ namespace Mobge.Sheets {
         }
         private void UpdateMappings(SerializedProperty pMappings, Type rowType, out int validCount) {
             _mappingRefs.Clear();
-            if(BinarySerializer.TryGetFields(rowType, out var fields)) {
+            if(SheetData.TryGetFields(rowType, out var fields)) {
                 for(int i = 0; i < fields.Length; i++) {
                     var field = fields[i];
                     MappingRef mr;
                     mr.name = field.Name;
-                    mr.valid = !IsPrimitive(field.FieldType);
+                    mr.valid = !IsPrimitive(field.type);
                     mr.index = -1;
-                    mr.fieldType = field.FieldType;
+                    mr.fieldType = field.type;
                     _mappingRefs.Add(mr);
                 }
             }

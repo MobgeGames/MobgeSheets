@@ -71,6 +71,7 @@ namespace Mobge.Sheets {
         public struct DropDownData {
             public string[] options;
             public int2 start, size;
+            public bool multiSelect;
         }
         public async Task SetDropDowns(DropDownData[] dropDowns) {
             int sheetTabId = await GetSheetTabId();
