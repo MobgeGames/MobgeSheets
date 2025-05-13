@@ -121,8 +121,8 @@ namespace Mobge.DoubleKing {
             b.AddParameter("redirect_uri", redirectUri);
             b.AddParameter("state", state);
             
-            Application.OpenURL(b.Uri);
-            //System.Diagnostics.Process.Start(b.Uri);
+            // Application.OpenURL(b.Uri);
+            System.Diagnostics.Process.Start(b.Uri);
         }
         public static int GetRandomUnusedPort()
         {
