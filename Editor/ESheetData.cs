@@ -207,9 +207,10 @@ namespace Mobge.Sheets {
                     boxHeight += mapHeight;
                 }
                 EditorGUI.DrawRect(s_layout.NextRect(boxHeight + seperator, true), new Color(0,0,0,0.15f));
-                s_layout.NextSplitRect(s_layout.Width * 0.5f, out var rLabel, out var rSpace);
+                s_layout.NextSplitRect(s_layout.Width * 0.5f, out var rLabel, out var rButtons);
+                LayoutRectSource.SplitRect(rButtons, rButtons.width - 30, out var rListKeys, out var rDelete, 5);
                 EditorGUI.LabelField(rLabel, mr.name);
-                if(GUI.Button(rSpace, "List Keys")) {
+                if(GUI.Button(rListKeys, "List Keys")) {
                     SheetData.AMapping mapping =  pMap.ReadObject<SheetData.AMapping>(out _);
                     if(mapping != null) {
                         List<string> allKeys = new();
@@ -226,7 +227,7 @@ namespace Mobge.Sheets {
                         Debug.Log("Mapping is not set");
                     }
                 }
-                if(GUILayout.Button("X")) {
+                if(GUI.Button(rDelete, "X")) {
                     deleteIndex = mr.index;
                 }
                 
