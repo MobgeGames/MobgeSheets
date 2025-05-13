@@ -145,16 +145,23 @@ namespace Mobge.Sheets {
             //EditorGUILayout.BeginHorizontal();
             var rButtons = s_layout.NextRect();
             //int count = _mappingRefs.Count;
-            float bWidth = 80;
             Rect r = rButtons;
             float spacing = 5;
-            r.width = bWidth - spacing;
+            r.width = 0;
             //EditorGUILayout.LabelField("Columns", GUILayout.Width(110));
+            float xMax = rButtons.xMax;
             for(int i = 0; i < _mappingRefs.Count; i++) {
                 var mr = _mappingRefs.array[i];
+                var buttonContent = new GUIContent(mr.name);
+                float bWidth = GUI.skin.button.CalcSize(buttonContent).x + 5f;
+                r.width = bWidth;
+                if(i != 0 && r.xMax > xMax) {
+                    r = s_layout.NextRect();
+                    r.width = bWidth;
+                }
                 bool dEnabled = GUI.enabled;
                 GUI.enabled = dEnabled && mr.valid && mr.index < 0;
-                if(GUI.Button(r, mr.name)) {
+                if(GUI.Button(r, buttonContent)) {
                     int mIndex = pMappings.arraySize;
                     pMappings.InsertArrayElementAtIndex(mIndex);
                     var pMapping = pMappings.GetArrayElementAtIndex(mIndex);
