@@ -118,6 +118,9 @@ namespace Mobge.Sheets {
         }
         private void PropertyField(SerializedProperty p, string path) {
             p = p.FindPropertyRelative(path);
+            if (p == null) {
+                return;
+            }
             float height = EditorGUI.GetPropertyHeight(p);
             EditorGUI.PropertyField(s_layout.NextRect(height), p, true);
         }
