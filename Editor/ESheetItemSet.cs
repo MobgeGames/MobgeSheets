@@ -7,7 +7,7 @@ using System.Reflection;
 namespace Mobge.Sheets {
     [CustomEditor(typeof(SheetItemSet<>), true)]
     public class ESheetItemSet : EItemSetT {
-        private class Dummy : SetEntry {
+        private class Dummy : ISetEntry {
             public string Name => throw new System.NotImplementedException();
 
             public Sprite Icon => throw new System.NotImplementedException();

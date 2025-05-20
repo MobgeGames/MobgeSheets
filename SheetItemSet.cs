@@ -5,11 +5,11 @@ using System.Linq;
 using UnityEngine;
 
 namespace Mobge.Sheets {
-    public interface SetEntry {
+    public interface ISetEntry {
         public string Name { get; }
         public Sprite Icon { get; }
     }
-    public abstract class SheetItemSet<T> : ItemSetT<T> where T : SetEntry {
+    public abstract class SheetItemSet<T> : ItemSetT<T> where T : ISetEntry {
         public Data data;
 
 #if UNITY_EDITOR
@@ -40,7 +40,15 @@ namespace Mobge.Sheets {
                 }
                 var arr = rows.Cast<T>().ToArray();
                 Editor_set.items.Clear();
+                Editor_set.items = new Map();
 
+                foreach (var item in arr) {
+                    Editor_set.items.AddElement(new Item {
+                        name = item.Name,
+                        sprite = item.Icon,
+                        serializedContent = item,
+                    });
+                }
 #else
                 return;
 #endif
