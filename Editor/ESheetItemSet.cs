@@ -3,13 +3,14 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEditor;
 using System.Reflection;
+using System;
 
 namespace Mobge.Sheets {
     [CustomEditor(typeof(SheetItemSet<>), true)]
     public class ESheetItemSet : EItemSetT {
         private class Dummy : ISetEntry {
+            public int Id => throw new System.NotImplementedException();
             public string Name => throw new System.NotImplementedException();
-
             public Sprite Icon => throw new System.NotImplementedException();
         }
         private MethodInfo f_EnsureEditorData;
@@ -23,6 +24,8 @@ namespace Mobge.Sheets {
             }
             Undo.RecordObject(_go, "Item edit");
             serializedObject.Update();
+            var pKeepIdsInRows = serializedObject.FindProperty(nameof(SheetItemSet<Dummy>.keepIdsInRows));
+            EditorGUILayout.PropertyField(pKeepIdsInRows, true);
             var pName = serializedObject.FindProperty(nameof(SheetItemSet<Dummy>.data));
             EditorGUILayout.PropertyField(pName, true);
             serializedObject.ApplyModifiedProperties();

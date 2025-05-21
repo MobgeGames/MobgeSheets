@@ -6,11 +6,15 @@ using UnityEngine;
 
 namespace Mobge.Sheets {
     public interface ISetEntry {
+        public int Id { get; }
         public string Name { get; }
         public Sprite Icon { get; }
     }
-    public abstract class SheetItemSet<T> : ItemSetT<T> where T : ISetEntry {
+    public abstract class SheetItemSet<T> : ItemSetT<T> where T : ISetEntry  {
         public Data data;
+        public bool keepIdsInRows;
+
+        protected virtual void UpdateData(object[] rows, ItemSet editorSet) { }
 
 #if UNITY_EDITOR
         public bool EnsureEditorData() {
@@ -39,16 +43,31 @@ namespace Mobge.Sheets {
                     return;
                 }
                 var arr = rows.Cast<T>().ToArray();
-                Editor_set.items.Clear();
-                Editor_set.items = new Map();
-
-                foreach (var item in arr) {
-                    Editor_set.items.AddElement(new Item {
-                        name = item.Name,
-                        sprite = item.Icon,
-                        serializedContent = item,
-                    });
+                var itemset = (SheetItemSet<T>)Editor_set;
+                if (!itemset.keepIdsInRows) {
+                    itemset.items.Clear();
+                    itemset.items = new Map();
+                    foreach (var item in arr) {
+                        itemset.items.AddElement(new Item {
+                            name = item.Name,
+                            sprite = item.Icon,
+                            serializedContent = item,
+                        });
+                    }
                 }
+                else {
+                    var dict = new Dictionary<int, Item>();
+                    foreach (var item in arr) {
+                        dict[item.Id] = new Item {
+                            name = item.Name,
+                            sprite = item.Icon,
+                            serializedContent = item,
+                        };
+                    }
+                    itemset.items.SetAll(dict);
+                }
+
+                itemset.UpdateData(rows, Editor_set);
 #else
                 return;
 #endif
