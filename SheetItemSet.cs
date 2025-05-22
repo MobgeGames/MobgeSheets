@@ -10,7 +10,7 @@ namespace Mobge.Sheets {
         public string Name { get; }
         public Sprite Icon { get; }
     }
-    public abstract class SheetItemSet<T> : ItemSetT<T> where T : ISetEntry  {
+    public abstract class SheetItemSet<T> : ItemSetT<T> where T : class, ISetEntry  {
         public Data data;
         public bool keepIdsInRows;
 
