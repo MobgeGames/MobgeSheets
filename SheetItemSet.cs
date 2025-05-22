@@ -57,7 +57,14 @@ namespace Mobge.Sheets {
                 }
                 else {
                     var dict = new Dictionary<int, Item>();
-                    foreach (var item in arr) {
+                    
+                    for (int i = 0; i < arr.Length; i++) {
+                        var item = arr[i];
+                        if (dict.ContainsKey(item.Id)) {
+                            Debug.LogError($"Duplicate item ID {item.Id} found at row {i}. Item name: {item.Name}");
+                            return;
+                        }
+                        
                         dict[item.Id] = new Item {
                             name = item.Name,
                             sprite = item.Icon,
