@@ -13,6 +13,7 @@ namespace Mobge.Sheets {
     public abstract class SheetItemSet<T> : ItemSetT<T> where T : class, ISetEntry  {
         public Data data;
         public bool keepIdsInRows;
+        public bool itemsReadOnly = true;
 
         protected virtual void UpdateData(object[] rows, ItemSet editorSet) { }
 

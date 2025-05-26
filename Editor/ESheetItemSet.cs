@@ -26,10 +26,18 @@ namespace Mobge.Sheets {
             serializedObject.Update();
             var pKeepIdsInRows = serializedObject.FindProperty(nameof(SheetItemSet<Dummy>.keepIdsInRows));
             EditorGUILayout.PropertyField(pKeepIdsInRows, true);
+            var pItemsReadOnly = serializedObject.FindProperty(nameof(SheetItemSet<Dummy>.itemsReadOnly));
+            EditorGUILayout.PropertyField(pItemsReadOnly, true);
             var pName = serializedObject.FindProperty(nameof(SheetItemSet<Dummy>.data));
             EditorGUILayout.PropertyField(pName, true);
             serializedObject.ApplyModifiedProperties();
+            if (pItemsReadOnly.boolValue) {
+                GUI.enabled = false;
+            }
             base.OnInspectorGUI();
+            if (pItemsReadOnly.boolValue) {
+                GUI.enabled = true;
+            }
         }
     }
 }
