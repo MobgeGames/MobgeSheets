@@ -12,14 +12,14 @@ using UnityEngine;
 
 namespace Mobge.Sheets {
     public partial class ESheetData {
-         private async void UpdateFromSheet(SerializedProperty p) {
+        public static async void UpdateFromSheet(SerializedProperty p) {
             var go = p.ReadObject<SheetData>(out var t);
             int2 size = await DetectSize(go);
             var range = go.tableStart.GetRange(size);
             await ReadFromSheet(p, go, range);
         }
 
-        private async Task ReadFromSheet(SerializedProperty p, SheetData go, string range) {
+        private static async Task ReadFromSheet(SerializedProperty p, SheetData go, string range) {
             var result = await go.googleSheet.GetValues(Dimension.ROWS, range);
             var nodes = result[0];
             int rowCount = nodes.Count - 1;
@@ -107,7 +107,7 @@ namespace Mobge.Sheets {
             Debug.Log(ctx.report, p.serializedObject.targetObject);
             
         }
-        private object ConvertToObject(string textValue, SheetData.Field field, SheetData.AMapping mapping, in ReadCellContext ctx) {
+        private static object ConvertToObject(string textValue, SheetData.Field field, SheetData.AMapping mapping, in ReadCellContext ctx) {
             textValue = textValue.Trim(SheetData.s_trimChars);
             object value = null;
             if(IsPrimitive(field.type)) {
@@ -128,7 +128,7 @@ namespace Mobge.Sheets {
             return value;
         }
 
-        private object GetPrimitiveValue(string textValue, Type t) {
+        private static object GetPrimitiveValue(string textValue, Type t) {
             object value = null;
             if(t == typeof(int)) {
                 int.TryParse(textValue, out int i);
@@ -156,7 +156,7 @@ namespace Mobge.Sheets {
             return value;
         }
 
-        private async Task<int2>DetectSize(SheetData go) {
+        public static async Task<int2>DetectSize(SheetData go) {
             var start = go.tableStart;
             if(string.IsNullOrEmpty(start.column)) {
                 start.column = "A";
@@ -240,7 +240,7 @@ namespace Mobge.Sheets {
             TryUpdateDropdowns(_go, rowCount);
         }
         private async void TryUpdateDropdowns(SheetData go) {
-            int2 size = await this.DetectSize(go);
+            int2 size = await DetectSize(go);
             if(size.y < 2) {
                 Debug.LogError("Table has no rows.");
                 return;

@@ -288,7 +288,7 @@ namespace Mobge.Sheets {
                 }
             }
         }
-        private bool IsPrimitive(Type t) {
+        private static bool IsPrimitive(Type t) {
             return t == typeof(int) || t == typeof(string) || t == typeof(bool) || t == typeof(float) || t == typeof(long) || t == typeof(double);
         }
 
