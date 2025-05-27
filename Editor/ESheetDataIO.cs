@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
@@ -131,7 +132,7 @@ namespace Mobge.Sheets {
         private static object GetPrimitiveValue(string textValue, Type t) {
             object value = null;
             if(t == typeof(int)) {
-                int.TryParse(textValue, out int i);
+                int.TryParse(textValue, NumberStyles.Any, CultureInfo.InvariantCulture, out int i);
                 value = i;
             }
             else if(t == typeof(string)) {
@@ -142,15 +143,15 @@ namespace Mobge.Sheets {
                 value = i;
             }
             else if(t == typeof(float)) {
-                float.TryParse(textValue, out float i);
+                float.TryParse(textValue, NumberStyles.Any, CultureInfo.InvariantCulture, out float i);
                 value = i;
             }
             else if(t == typeof(long)) {
-                long.TryParse(textValue, out long i);
+                long.TryParse(textValue, NumberStyles.Any, CultureInfo.InvariantCulture, out long i);
                 value = i;
             }
             else if(t == typeof(double)) {
-                double.TryParse(textValue, out double i);
+                double.TryParse(textValue, NumberStyles.Any, CultureInfo.InvariantCulture, out double i);
                 value = i;
             }
             return value;
