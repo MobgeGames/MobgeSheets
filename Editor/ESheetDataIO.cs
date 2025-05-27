@@ -12,7 +12,7 @@ using UnityEngine;
 
 namespace Mobge.Sheets {
     public partial class ESheetData {
-        public static async void UpdateFromSheet(SerializedProperty p) {
+        public static async Task UpdateFromSheet(SerializedProperty p) {
             var go = p.ReadObject<SheetData>(out var t);
             int2 size = await DetectSize(go);
             var range = go.tableStart.GetRange(size);
