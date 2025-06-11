@@ -107,13 +107,41 @@ namespace Mobge.Sheets {
                 }
             }
         }
-        public static bool TryGetFields(Type type, out Field[] fields) {
-            if(!BinarySerializer.TryGetFields(type, out var ffs)) {
+        [Serializable]
+        public class EnumMapping<T> : AMapping<T> where T : Enum
+        {
+            public override void GetAllKeys(List<string> keys)
+            {
+                var names = Enum.GetNames(typeof(T));
+                keys.AddRange(names);
+            }
+
+            public override T GetObject(string key)
+            {
+                if (Enum.TryParse(typeof(T), key, out var result) && result is T value)
+                    return value;
+                else
+                {
+                    Debug.LogError($"Key: {key} can't parsed, return default enum value");
+                    return default;
+                }
+            }
+
+            public override bool ValidateValueT(T value)
+            {
+                return Enum.IsDefined(typeof(T), value);
+            }
+        }
+        public static bool TryGetFields(Type type, out Field[] fields)
+        {
+            if (!BinarySerializer.TryGetFields(type, out var ffs))
+            {
                 fields = null;
                 return false;
             }
             fields = new Field[ffs.Length];
-            for(int i = 0; i < ffs.Length; i++) {
+            for (int i = 0; i < ffs.Length; i++)
+            {
                 fields[i] = new Field(ffs[i]);
             }
             return true;
