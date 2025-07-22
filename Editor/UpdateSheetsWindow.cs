@@ -9,6 +9,7 @@ namespace Mobge.Sheets
     {
         private List<(SerializedObject serializedObject, ISheetDataOwner owner, string name, string type, Object reference)> loadedSheets = new();
         private Vector2 scrollPos;
+        private bool isUpdating = false;
 
         [MenuItem("Mobge/Sheets/Update Sheets")]
         public static void ShowWindow()
@@ -18,6 +19,11 @@ namespace Mobge.Sheets
 
         private void OnGUI()
         {
+            if (isUpdating)
+            {
+                EditorGUILayout.HelpBox("Updating... Please wait.", MessageType.Info);
+                GUI.enabled = false;
+            }
             if (GUILayout.Button("Load Sheets"))
             {
                 LoadSheets();
@@ -26,6 +32,7 @@ namespace Mobge.Sheets
             {
                 UpdateSheets();
             }
+            GUI.enabled = true;
 
             GUILayout.Space(10);
             GUILayout.Label("Loaded Sheets:", EditorStyles.boldLabel);
@@ -81,29 +88,49 @@ namespace Mobge.Sheets
             loadedSheets.Clear();
             foreach (var sheetDataOwner in FindAllSheetDataOwnersInProject())
             {
-                var sheetData = sheetDataOwner.Item2.GetSheetData();
-                if (sheetData == null || string.IsNullOrEmpty(sheetData.googleSheet.sheetId))
+                var sheetDataArray = sheetDataOwner.Item2.GetSheetData();
+                if (sheetDataArray == null || sheetDataArray.Count == 0)
                 {
                     continue;
                 }
-                loadedSheets.Add((sheetDataOwner.Item1, sheetDataOwner.Item2, sheetDataOwner.Item3, sheetDataOwner.Item4, sheetDataOwner.Item5));
+                foreach (var sheetData in sheetDataArray)
+                {
+                    if (sheetData == null || string.IsNullOrEmpty(sheetData.googleSheet.sheetId))
+                    {
+                        continue;
+                    }
+                    loadedSheets.Add((sheetDataOwner.Item1, sheetDataOwner.Item2, sheetDataOwner.Item3, sheetDataOwner.Item4, sheetDataOwner.Item5));
+                }
             }
             Repaint();
         }
 
         private async void UpdateSheets()
         {
+            isUpdating = true;
+            Repaint();
             foreach (var sheet in loadedSheets)
             {
-                var sheetData = sheet.owner.GetSheetData();
-                var size = await ESheetData.DetectSize(sheetData);
-                var range = sheetData.tableStart.GetRange(size);
+                var sheetDataArray = sheet.owner.GetSheetData();
+                if (sheetDataArray == null) continue;
 
-                await ESheetData.ReadFromSheet(null, sheetData, range);
-                EditorExtensions.SetDirty(sheet.owner as Object);
+                foreach (var sheetData in sheetDataArray)
+                {
+                    if (sheetData == null || string.IsNullOrEmpty(sheetData.googleSheet.sheetId))
+                    {
+                        continue;
+                    }
+                    var size = await ESheetData.DetectSize(sheetData);
+                    var range = sheetData.tableStart.GetRange(size);
+
+                    await ESheetData.ReadFromSheet(null, sheetData, range);
+                    EditorExtensions.SetDirty(sheet.owner as Object);
+                }
             }
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
+            isUpdating = false;
+            Repaint();
         }
     }
 }

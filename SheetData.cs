@@ -282,6 +282,6 @@ namespace Mobge.Sheets {
     }
 
     public interface ISheetDataOwner{
-        public SheetData GetSheetData();
+        public List<SheetData> GetSheetData();
     }
 }
