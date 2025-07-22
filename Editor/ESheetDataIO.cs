@@ -20,7 +20,7 @@ namespace Mobge.Sheets {
             await ReadFromSheet(p, go, range);
         }
 
-        private static async Task ReadFromSheet(SerializedProperty p, SheetData go, string range) {
+        public static async Task ReadFromSheet(SerializedProperty p, SheetData go, string range) {
             var result = await go.googleSheet.GetValues(Dimension.ROWS, range);
             var nodes = result[0];
             int rowCount = nodes.Count - 1;
@@ -29,9 +29,16 @@ namespace Mobge.Sheets {
             ctx.sheetData = go;
             ctx.report = new();
             ctx.report.Append("Updating Sheet: (");
-            ctx.report.Append(p.serializedObject.targetObject.name);
-            ctx.report.Append(", ");
-            ctx.report.Append(p.propertyPath);
+            if (p != null)
+            {
+                ctx.report.Append(p.serializedObject.targetObject.name);
+                ctx.report.Append(", ");
+                ctx.report.Append(p.propertyPath);
+            }
+            else
+            {
+                ctx.report.Append("Unknown");
+            }
             ctx.report.Append(")");
 
             ctx.report.AppendLine(" Data count: " + rowCount);
@@ -100,13 +107,22 @@ namespace Mobge.Sheets {
                 }
                 data[i] = rowData;
             }
-            Undo.RecordObject(p.serializedObject.targetObject, "Update data from sheet");
+
+            if(p != null) {
+                Undo.RecordObject(p.serializedObject.targetObject, "Update data from sheet");
+            }
+
             go.UpdateData(data);
-            p.WriteObject(go);
-            p.serializedObject.ApplyModifiedProperties();
-            EditorExtensions.SetDirty(p.serializedObject.targetObject);
-            Debug.Log(ctx.report, p.serializedObject.targetObject);
-            
+
+            if (p != null)
+            {
+                p.WriteObject(go);
+
+                p.serializedObject.ApplyModifiedProperties();
+                EditorExtensions.SetDirty(p.serializedObject.targetObject);
+                Debug.Log(ctx.report, p.serializedObject.targetObject);
+            }
+
         }
         private static object ConvertToObject(string textValue, SheetData.Field field, SheetData.AMapping mapping, in ReadCellContext ctx) {
             textValue = textValue.Trim(SheetData.s_trimChars);

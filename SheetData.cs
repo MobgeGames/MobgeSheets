@@ -280,4 +280,8 @@ namespace Mobge.Sheets {
         ROWS,
         COLUMNS
     }
+
+    public interface ISheetDataOwner{
+        public SheetData GetSheetData();
+    }
 }
