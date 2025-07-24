@@ -49,6 +49,7 @@ namespace Mobge.Sheets {
             public abstract void GetAllKeys(List<string> keys);
             public abstract object GetObjectRaw(string key);
             public abstract bool ValidateValue(object value);
+            public abstract string GetKeyFromObject(object obj);
             
         }
 
@@ -82,6 +83,12 @@ namespace Mobge.Sheets {
             }
             public override object GetObjectRaw(string key) {
                 return GetObject(key);
+            }
+            public override string GetKeyFromObject(object obj) {
+                if (obj is T t) {
+                    return GetKey(t);
+                }
+                return "";
             }
         }
         [Serializable]

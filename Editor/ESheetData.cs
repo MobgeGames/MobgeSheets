@@ -105,11 +105,22 @@ namespace Mobge.Sheets {
         }
 
         private void UpdateDataButton(Rect rHeader, SerializedProperty property) {
-            var gc = new GUIContent("Update Data");
-            float buttonWidth = 10f + GUI.skin.button.CalcSize(gc).x;
-            Rect buttonRect = new Rect(rHeader.x + rHeader.width - buttonWidth, rHeader.y, buttonWidth, rHeader.height);
-            if (GUI.Button(buttonRect, gc)) {
+            var gcUpdate = new GUIContent("Update Data");
+            var gcWrite = new GUIContent("Write to Sheet");
+            
+            float updateButtonWidth = 10f + GUI.skin.button.CalcSize(gcUpdate).x;
+            float writeButtonWidth = 10f + GUI.skin.button.CalcSize(gcWrite).x;
+            float totalButtonWidth = updateButtonWidth + writeButtonWidth + 5f;
+            
+            Rect updateButtonRect = new Rect(rHeader.x + rHeader.width - totalButtonWidth, rHeader.y, updateButtonWidth, rHeader.height);
+            Rect writeButtonRect = new Rect(updateButtonRect.xMax + 5f, rHeader.y, writeButtonWidth, rHeader.height);
+            
+            if (GUI.Button(updateButtonRect, gcUpdate)) {
                 UpdateFromSheet(property);
+            }
+            
+            if (GUI.Button(writeButtonRect, gcWrite)) {
+                WriteToSheetAsync(property);
             }
         }
 
@@ -289,9 +300,15 @@ namespace Mobge.Sheets {
                 }
             }
         }
-        private static bool IsPrimitive(Type t) {
-            return t == typeof(int) || t == typeof(string) || t == typeof(bool) || t == typeof(float) || t == typeof(long) || t == typeof(double);
-        }
+
+         private async void WriteToSheetAsync(SerializedProperty property) {
+             try {
+                 await WriteToSheet(property);
+             }
+             catch (System.Exception e) {
+                 Debug.LogError($"Error writing to Google Sheets: {e.Message}");
+             }
+         }
         
        
     }
