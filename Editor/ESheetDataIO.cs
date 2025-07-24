@@ -10,6 +10,7 @@ using SimpleJSON;
 using Unity.Mathematics;
 using UnityEditor;
 using UnityEngine;
+using static Mobge.Sheets.SheetData;
 
 namespace Mobge.Sheets {
     public partial class ESheetData {
@@ -19,104 +20,105 @@ namespace Mobge.Sheets {
             var range = go.tableStart.GetRange(size);
             await ReadFromSheet(p, go, range);
         }
+        private static ReadCellContext FindMapping(SheetData go, JSONNode header) {
+            ReadCellContext ctx = default;
+            ctx.sheetData = go;
+            ctx.report = new();
+            SheetData.TryGetFields(go.RowType, out ctx.fields);
+            ctx.fieldCount = ctx.fields.GetLength();
+            ctx.columnIndexes = new int[ctx.fieldCount];
+            ctx.mappings = new SheetData.AMapping[ctx.fieldCount];
+            for (int i = 0; i < ctx.fieldCount; i++) {
+                var field = ctx.fields[i];
+                int selectedIndex = -1;
+                for (int ih = 0; ih < header.Count; ih++) {
+                    var columnCell = header[ih];
+                    if (columnCell.Value.Equals(field.Name, StringComparison.InvariantCultureIgnoreCase)) {
+                        selectedIndex = ih;
+                        break;
+                    }
+                }
+                ctx.columnIndexes[i] = selectedIndex;
+                if (selectedIndex < 0) {
+                    ctx.report.AppendLine("No column found for field: " + field.Name);
+                }
 
+                if (!IsPrimitive(field.type)) {
+                    int mappingCount = ctx.sheetData.mappings.GetLength();
+                    SheetData.AMapping selectedMapping = default;
+                    for (int im = 0; im < mappingCount; im++) {
+                        var mapping = ctx.sheetData.mappings[im];
+                        if (mapping.fieldName == field.Name) {
+                            selectedMapping = mapping.mapping;
+                            break;
+                        }
+                    }
+                    ctx.mappings[i] = selectedMapping;
+                    if (selectedMapping == null) {
+                        ctx.report.AppendLine("No mapping found for column: " + field.Name);
+                    }
+                }
+            }
+            return ctx;
+        }
         public static async Task ReadFromSheet(SerializedProperty p, SheetData go, string range) {
             var result = await go.googleSheet.GetValues(Dimension.ROWS, range);
             var nodes = result[0];
             int rowCount = nodes.Count - 1;
             var header = nodes[0];
-            ReadCellContext ctx;
-            ctx.sheetData = go;
-            ctx.report = new();
+            ReadCellContext ctx = FindMapping(go, header);
             ctx.report.Append("Updating Sheet: (");
-            if (p != null)
-            {
+            if (p != null) {
                 ctx.report.Append(p.serializedObject.targetObject.name);
                 ctx.report.Append(", ");
                 ctx.report.Append(p.propertyPath);
             }
-            else
-            {
+            else {
                 ctx.report.Append("Unknown");
             }
             ctx.report.Append(")");
 
             ctx.report.AppendLine(" Data count: " + rowCount);
-            SheetData.TryGetFields(go.RowType, out var fields);
-            int fieldCount = fields.GetLength();
-            int[] columnIndexes = new int[fieldCount];
-            SheetData.AMapping[] mappings = new SheetData.AMapping[fieldCount];
-            for(int i = 0; i < fieldCount; i++) {
-                var field = fields[i];
-                int selectedIndex = -1;
-                for(int ih = 0; ih < header.Count; ih++) {
-                    var columnCell = header[ih];
-                    if(columnCell.Value.Equals(field.Name, StringComparison.InvariantCultureIgnoreCase)) {
-                        selectedIndex = ih;
-                        break;
-                    }
-                }
-                columnIndexes[i] = selectedIndex;
-                if(selectedIndex < 0) {
-                    ctx.report.AppendLine("No column found for field: " + field.Name);
-                }
-
-                if(!IsPrimitive(field.type)) {
-                    int mappingCount = go.mappings.GetLength();
-                    SheetData.AMapping selectedMapping = default;
-                    for(int im = 0; im < mappingCount; im++) {
-                        var mapping = go.mappings[im];
-                        if(mapping.fieldName == field.Name) {
-                            selectedMapping = mapping.mapping;
-                            break;
-                        }
-                    }
-                    mappings[i] = selectedMapping;
-                    if(selectedMapping == null) {
-                        ctx.report.AppendLine("No mapping found for column: " + field.Name);
-                    }
-                }
-            }
+            
             object[] data = new object[rowCount];
-            for(int i = 0; i < rowCount; i++) {
+            for (int i = 0; i < rowCount; i++) {
                 var rowCells = nodes[i + 1].AsArray;
                 object rowData = Activator.CreateInstance(go.RowType);
-                for (int iField = 0; iField < fieldCount; iField++) {
-                    ctx.columnIndex = columnIndexes[iField];
+                for (int iField = 0; iField < ctx.fieldCount; iField++) {
+                    ctx.columnIndex = ctx.columnIndexes[iField];
                     if (ctx.columnIndex < 0) {
                         continue;
                     }
                     ctx.rowIndex = i;
-                    var field = fields[iField];
+                    var field = ctx.fields[iField];
                     var textValue = rowCells[ctx.columnIndex].Value;
-                    object value = default;
+                    object value;
                     if (field.isArray) {
                         var values = textValue.Split(',');
                         var arr = Array.CreateInstance(field.type, values.Length);
                         for (int v = 0; v < values.Length; v++) {
                             string arrValue = values[v];
-                            var o = ConvertToObject(arrValue, field, mappings[iField], ctx);
+                            var o = ConvertToObject(arrValue, field, ctx.mappings[iField], ctx);
                             arr.SetValue(o, v);
                         }
                         value = arr;
                     }
                     else {
-                        value = ConvertToObject(textValue, field, mappings[iField], ctx);
+                        value = ConvertToObject(textValue, field, ctx.mappings[iField], ctx);
                     }
                     field.SetValue(rowData, value);
-                    
+
                 }
                 data[i] = rowData;
             }
 
-            if(p != null) {
+            if (p != null) {
                 Undo.RecordObject(p.serializedObject.targetObject, "Update data from sheet");
             }
 
             go.UpdateData(data);
 
-            if (p != null)
-            {
+            if (p != null) {
                 p.WriteObject(go);
 
                 p.serializedObject.ApplyModifiedProperties();
@@ -328,7 +330,10 @@ namespace Mobge.Sheets {
             public int columnIndex;
             public int rowIndex;
             public SheetData sheetData;
-
+            internal int fieldCount;
+            internal int[] columnIndexes;
+            public Field[] fields;
+            internal AMapping[] mappings;
         }
     }
 }

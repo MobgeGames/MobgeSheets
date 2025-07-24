@@ -49,13 +49,27 @@ namespace Mobge.Sheets {
             public abstract void GetAllKeys(List<string> keys);
             public abstract object GetObjectRaw(string key);
             public abstract bool ValidateValue(object value);
+            
         }
 
         [Serializable]
         public abstract class AMapping<T> : AMapping {
             public abstract T GetObject(string key);
+            public virtual bool Compare(T t1, T t2) {
+                return t1.Equals(t2);
+            }
+            public string GetKey(T o) {
+                List<string> keys = new();
+                GetAllKeys(keys);
+                for (int i = 0; i < keys.Count; i++) {
+                    if (Compare(o, GetObject(keys[i]))) {
+                        return keys[i];
+                    }
+                }
+                return "";
+            }
             public override bool ValidateValue(object value) {
-                if(value is T t) {
+                if (value is T t) {
                     return ValidateValueT(t);
                 }
                 return false;
@@ -88,7 +102,7 @@ namespace Mobge.Sheets {
                 int count = pairs.GetLength();
                 for(int i = 0; i < count; i++) {
                     keys.Add(pairs[i].Key);
-                }
+                } 
             }
             [Serializable]
             public struct Pair {
@@ -116,12 +130,10 @@ namespace Mobge.Sheets {
                 keys.AddRange(names);
             }
 
-            public override T GetObject(string key)
-            {
+            public override T GetObject(string key) {
                 if (Enum.TryParse(typeof(T), key, out var result) && result is T value)
                     return value;
-                else
-                {
+                else {
                     Debug.LogError($"Key: {key} can't parsed, return default enum value");
                     return default;
                 }
@@ -161,6 +173,7 @@ namespace Mobge.Sheets {
             fields = r.ToArray();
             return true;
         }
+
         public struct Field {
             public Type type;
             private FieldInfo[] _fieldInfos;
