@@ -32,11 +32,11 @@ namespace Mobge.Sheets {
         [MenuItem("Window/Mobge/Google Sheet Settings")]
         public static void SheetSettings() {
             var a = AssetDatabase.LoadAssetAtPath<GoogleSheetCredentials>(c_defaultSettingsPath);
-            if(a == null) {
+            if (a == null) {
                 string path = c_defaultSettingsPath;
                 var paths = path.Split("/");
                 string parent = paths[0];
-                for(int i = 1; i < paths.Length - 1; i++) {
+                for (int i = 1; i < paths.Length - 1; i++) {
                     AssetDatabase.CreateFolder(parent, paths[i]);
                     parent += "/" + paths[i];
                 }
@@ -49,7 +49,7 @@ namespace Mobge.Sheets {
             Selection.activeObject = a;
         }
         private static Meta GetMeta(SerializedProperty p) {
-            if(!s_editorMetas.TryGetValue(p, out var meta)) {
+            if (!s_editorMetas.TryGetValue(p, out var meta)) {
                 meta = new();
                 s_editorMetas.Add(p, meta);
             }
@@ -80,7 +80,7 @@ namespace Mobge.Sheets {
         // }
         public override void OnGUI(Rect position, SerializedProperty property, GUIContent label) {
             var go = property.ReadObject<SheetData>(out var t);
-            if(EnsureTableStart(go)) {
+            if (EnsureTableStart(go)) {
                 property.WriteObject(go);
             }
             var meta = GetMeta(property);
@@ -88,7 +88,7 @@ namespace Mobge.Sheets {
             var rHeader = s_layout.NextRect();
             UpdateDataButton(rHeader, property);
             EditorGUI.PropertyField(rHeader, property);
-            if(!property.isExpanded) {
+            if (!property.isExpanded) {
                 meta.height = s_layout.Height;
                 return;
             }
@@ -97,7 +97,7 @@ namespace Mobge.Sheets {
             PropertyField(property, nameof(SheetData.tableStart));
             MappingsEditor(property, go.RowType);
             UpdateSheetField(meta, property);
-            
+
             PropertyField(property, nameof(SheetData<int>.data));
             EditorGUI.indentLevel--;
             meta.height = s_layout.Height;
@@ -108,7 +108,7 @@ namespace Mobge.Sheets {
             var gc = new GUIContent("Update Data");
             float buttonWidth = 10f + GUI.skin.button.CalcSize(gc).x;
             Rect buttonRect = new Rect(rHeader.x + rHeader.width - buttonWidth, rHeader.y, buttonWidth, rHeader.height);
-            if(GUI.Button(buttonRect, gc)) {
+            if (GUI.Button(buttonRect, gc)) {
                 UpdateFromSheet(property);
             }
         }
@@ -126,11 +126,11 @@ namespace Mobge.Sheets {
         }
         private bool EnsureTableStart(SheetData d) {
             bool edited = false;
-            if(string.IsNullOrEmpty(d.tableStart.column)) {
+            if (string.IsNullOrEmpty(d.tableStart.column)) {
                 d.tableStart.column = "A";
                 edited = true;
             }
-            if(d.tableStart.row < 1) {
+            if (d.tableStart.row < 1) {
                 d.tableStart.row = 1;
                 edited = true;
             }
@@ -141,7 +141,7 @@ namespace Mobge.Sheets {
             var pMappings = property.FindPropertyRelative(nameof(SheetData.mappings));
 
             pMappings.isExpanded = EditorGUI.Foldout(s_layout.NextRect(), pMappings.isExpanded, "Columns", true);
-            if(!pMappings.isExpanded) {
+            if (!pMappings.isExpanded) {
                 return;
             }
             UpdateMappings(pMappings, rowType, out int validCount);
@@ -153,37 +153,38 @@ namespace Mobge.Sheets {
             r.width = 0;
             //EditorGUILayout.LabelField("Columns", GUILayout.Width(110));
             float xMax = rButtons.xMax;
-            for(int i = 0; i < _mappingRefs.Count; i++) {
+            for (int i = 0; i < _mappingRefs.Count; i++) {
                 var mr = _mappingRefs.array[i];
                 var buttonContent = new GUIContent(mr.name);
                 float bWidth = GUI.skin.button.CalcSize(buttonContent).x + 5f;
                 r.width = bWidth;
-                if(i != 0 && r.xMax > xMax) {
+                if (i != 0 && r.xMax > xMax) {
                     r = s_layout.NextRect();
                     r.width = bWidth;
                 }
                 bool dEnabled = GUI.enabled;
+                
                 GUI.enabled = dEnabled && mr.valid && mr.index < 0;
-                if(GUI.Button(r, buttonContent)) {
+                if (GUI.Button(r, buttonContent)) {
                     int mIndex = pMappings.arraySize;
                     pMappings.InsertArrayElementAtIndex(mIndex);
                     var pMapping = pMappings.GetArrayElementAtIndex(mIndex);
                     pMapping.FindPropertyRelative(nameof(SheetData.MappingEntry.fieldName)).stringValue = mr.name;
                     pMapping.FindPropertyRelative(nameof(SheetData.MappingEntry.mapping)).managedReferenceValue = null;
-                    
+
                 }
                 GUI.enabled = dEnabled;
                 r.x += r.width + spacing;
-                
+
             }
             //EditorGUILayout.EndHorizontal();
-            
+
             EditorGUI.indentLevel++;
             MappingsField(pMappings);
             EditorGUI.indentLevel--;
         }
         private SRAttribute GetSrAttribute(Type type) {
-            if(!s_srAttributes.TryGetValue(type, out var att)) {
+            if (!s_srAttributes.TryGetValue(type, out var att)) {
                 var gType = typeof(SheetData.AMapping<>).MakeGenericType(type);
                 att = new SRAttribute(gType);
                 s_srAttributes.Add(type, att);
@@ -193,10 +194,10 @@ namespace Mobge.Sheets {
         private void MappingsField(SerializedProperty pMappings) {
             int deleteIndex = -1;
             float seperator = 3f;
-            for(int i = 0; i < _mappingRefs.Count; i++) {
+            for (int i = 0; i < _mappingRefs.Count; i++) {
                 s_layout.NextRect(seperator);
                 var mr = _mappingRefs.array[i];
-                if(mr.index < 0) {
+                if (mr.index < 0) {
                     continue;
                 }
                 var pMapping = pMappings.GetArrayElementAtIndex(mr.index);
@@ -204,23 +205,23 @@ namespace Mobge.Sheets {
                 float boxHeight = EditorGUIUtility.singleLineHeight;
                 float mapHeight = 0;
                 var gc = new GUIContent(pMap.displayName);
-                if(mr.fieldType != null) {
-                    
+                if (mr.fieldType != null) {
+
                     mapHeight = s_srDrawer.GetPropertyHeight(pMap, gc);
                     boxHeight += mapHeight;
                 }
-                EditorGUI.DrawRect(s_layout.NextRect(boxHeight + seperator, true), new Color(0,0,0,0.15f));
+                EditorGUI.DrawRect(s_layout.NextRect(boxHeight + seperator, true), new Color(0, 0, 0, 0.15f));
                 s_layout.NextSplitRect(s_layout.Width * 0.5f, out var rLabel, out var rButtons);
                 LayoutRectSource.SplitRect(rButtons, rButtons.width - 30, out var rListKeys, out var rDelete, 5);
                 EditorGUI.LabelField(rLabel, mr.name);
-                if(GUI.Button(rListKeys, "List Keys")) {
-                    SheetData.AMapping mapping =  pMap.ReadObject<SheetData.AMapping>(out _);
-                    if(mapping != null) {
+                if (GUI.Button(rListKeys, "List Keys")) {
+                    SheetData.AMapping mapping = pMap.ReadObject<SheetData.AMapping>(out _);
+                    if (mapping != null) {
                         List<string> allKeys = new();
                         mapping.GetAllKeys(allKeys);
                         StringBuilder sb = new();
                         sb.AppendLine("All Keys of field: " + mr.name);
-                        foreach(var k in allKeys) {
+                        foreach (var k in allKeys) {
                             sb.AppendLine(k);
 
                         }
@@ -230,28 +231,28 @@ namespace Mobge.Sheets {
                         Debug.Log("Mapping is not set");
                     }
                 }
-                if(GUI.Button(rDelete, "X")) {
+                if (GUI.Button(rDelete, "X")) {
                     deleteIndex = mr.index;
                 }
-                
-                if(mr.fieldType != null) {
+
+                if (mr.fieldType != null) {
                     s_srDrawer.SetAttribute(GetSrAttribute(mr.fieldType));
                     var rect = s_layout.NextRect(mapHeight);
                     s_srDrawer.OnGUI(rect, pMap, gc);
                 }
                 s_layout.NextRect(seperator);
-                
+
             }
-            if(deleteIndex >= 0) {
-                
+            if (deleteIndex >= 0) {
+
                 GUI.changed = true;
                 pMappings.DeleteArrayElementAtIndex(deleteIndex);
             }
-            
+
         }
         private int IndexOfMapping(int count, string fieldName) {
-            for(int i = 0; i < count; i++) {
-                if(_mappingRefs.array[i].name == fieldName) {
+            for (int i = 0; i < count; i++) {
+                if (_mappingRefs.array[i].name == fieldName) {
                     return i;
                 }
             }
@@ -259,8 +260,8 @@ namespace Mobge.Sheets {
         }
         private void UpdateMappings(SerializedProperty pMappings, Type rowType, out int validCount) {
             _mappingRefs.Clear();
-            if(SheetData.TryGetFields(rowType, out var fields)) {
-                for(int i = 0; i < fields.Length; i++) {
+            if (SheetData.TryGetFields(rowType, out var fields)) {
+                for (int i = 0; i < fields.Length; i++) {
                     var field = fields[i];
                     MappingRef mr;
                     mr.name = field.Name;
@@ -271,11 +272,11 @@ namespace Mobge.Sheets {
                 }
             }
             validCount = _mappingRefs.Count;
-            for(int i = 0; i < pMappings.arraySize; i++) {
+            for (int i = 0; i < pMappings.arraySize; i++) {
                 var m = pMappings.GetArrayElementAtIndex(i);
                 string fieldName = m.FindPropertyRelative(nameof(SheetData.MappingEntry.fieldName)).stringValue;
                 int index = IndexOfMapping(validCount, fieldName);
-                if(index >= 0) {
+                if (index >= 0) {
                     _mappingRefs.array[index].index = i;
                 }
                 else {
@@ -291,7 +292,7 @@ namespace Mobge.Sheets {
         private static bool IsPrimitive(Type t) {
             return t == typeof(int) || t == typeof(string) || t == typeof(bool) || t == typeof(float) || t == typeof(long) || t == typeof(double);
         }
-
+        
        
     }
 }

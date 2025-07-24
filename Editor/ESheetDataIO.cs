@@ -81,19 +81,19 @@ namespace Mobge.Sheets {
             for(int i = 0; i < rowCount; i++) {
                 var rowCells = nodes[i + 1].AsArray;
                 object rowData = Activator.CreateInstance(go.RowType);
-                for(int iField = 0; iField < fieldCount; iField++) {
+                for (int iField = 0; iField < fieldCount; iField++) {
                     ctx.columnIndex = columnIndexes[iField];
-                    if(ctx.columnIndex < 0) {
+                    if (ctx.columnIndex < 0) {
                         continue;
                     }
                     ctx.rowIndex = i;
                     var field = fields[iField];
                     var textValue = rowCells[ctx.columnIndex].Value;
                     object value = default;
-                    if(field.isArray) {
+                    if (field.isArray) {
                         var values = textValue.Split(',');
                         var arr = Array.CreateInstance(field.type, values.Length);
-                        for(int v = 0; v < values.Length; v++) {
+                        for (int v = 0; v < values.Length; v++) {
                             string arrValue = values[v];
                             var o = ConvertToObject(arrValue, field, mappings[iField], ctx);
                             arr.SetValue(o, v);
@@ -103,7 +103,8 @@ namespace Mobge.Sheets {
                     else {
                         value = ConvertToObject(textValue, field, mappings[iField], ctx);
                     }
-                    field.fieldInfo.SetValue(rowData, value);
+                    field.SetValue(rowData, value);
+                    
                 }
                 data[i] = rowData;
             }

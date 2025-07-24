@@ -50,7 +50,7 @@ namespace Mobge.Sheets {
             public abstract object GetObjectRaw(string key);
             public abstract bool ValidateValue(object value);
         }
-        
+
         [Serializable]
         public abstract class AMapping<T> : AMapping {
             public abstract T GetObject(string key);
@@ -132,35 +132,78 @@ namespace Mobge.Sheets {
                 return Enum.IsDefined(typeof(T), value);
             }
         }
-        public static bool TryGetFields(Type type, out Field[] fields)
-        {
-            if (!BinarySerializer.TryGetFields(type, out var ffs))
-            {
+        private static bool TryGetFields(Type type, Stack<FieldInfo> parentFields, List<Field> fields) {
+            if (!BinarySerializer.TryGetFields(type, out var ffs)) {
+                return false;
+            }
+            for (int i = 0; i < ffs.Length; i++) {
+                var fieldInfo = ffs[i];
+                parentFields.Push(fieldInfo);
+                var att = fieldInfo.GetCustomAttribute<SeperateColumns>();
+                if (att != null) {
+                    TryGetFields(fieldInfo.FieldType, parentFields, fields);
+                }
+                else {
+                    fields.Add(new Field(parentFields.Reverse().ToArray()));
+                }
+                parentFields.Pop();
+            }
+            return true;
+        }
+        public static bool TryGetFields(Type type, out Field[] fields) {
+            List<Field> r = new();
+            Stack<FieldInfo> parentFields = new();
+            TryGetFields(type, parentFields, r);
+            if (r.Count == 0) {
                 fields = null;
                 return false;
             }
-            fields = new Field[ffs.Length];
-            for (int i = 0; i < ffs.Length; i++)
-            {
-                fields[i] = new Field(ffs[i]);
-            }
+            fields = r.ToArray();
             return true;
         }
         public struct Field {
             public Type type;
-            public FieldInfo fieldInfo;
+            private FieldInfo[] _fieldInfos;
             public bool isArray;
-            public string Name => fieldInfo.Name;
-            public Field(FieldInfo f) {
-                this.fieldInfo = f;
-                var t = f.FieldType;
+            public string Name { get; private set; }
+            public void SetValue(object root, object value) {
+                SetValue(root, value, 0);
+            }
+            private void SetValue(object obj, object value, int index) {
+                var fInfo = _fieldInfos[index];
+                if (index == _fieldInfos.Length - 1) {
+                    fInfo.SetValue(obj, value);
+                    return;
+                }
+                var fieldValue = fInfo.GetValue(obj);
+                if (fieldValue == null) {
+                    fieldValue = Activator.CreateInstance(fInfo.FieldType);
+                }
+                SetValue(fieldValue, value, index + 1);
+                fInfo.SetValue(obj, fieldValue);
+            }
+            public Field(FieldInfo[] f) {
+                this._fieldInfos = f;
+                Name = GetName(f);
+                var t = f[^1].FieldType;
                 isArray = t.IsArray;
-                if(isArray) {
+                if (isArray) {
                     type = t.GetElementType();
                 }
                 else {
                     type = t;
                 }
+            }
+
+            private static string GetName(FieldInfo[] _fieldInfos) {
+                string s = "";
+                for (int i = 0; i < _fieldInfos.Length; i++) {
+                    if (i != 0) {
+                        s += ".";
+                    }
+                    s += _fieldInfos[i].Name;
+                }
+                return s;
             }
         }
         [Serializable]
@@ -275,6 +318,9 @@ namespace Mobge.Sheets {
             return range;
         }
         
+    }
+    public class SeperateColumns : PropertyAttribute {
+
     }
     public enum Dimension {
         ROWS,
