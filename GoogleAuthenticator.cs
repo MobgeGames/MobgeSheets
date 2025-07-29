@@ -28,7 +28,8 @@ namespace Mobge.DoubleKing {
         public GoogleAuthenticator(GoogleSheetCredentials credentials) {
             _credentials = credentials;
             string sData = PlayerPrefs.GetString(SaveKey, null);
-            if(!string.IsNullOrEmpty(sData)) {
+            if (!string.IsNullOrEmpty(sData))
+            {
                 _accessParams = JsonUtility.FromJson<AccessParams>(sData);
             }
         }
@@ -120,9 +121,12 @@ namespace Mobge.DoubleKing {
             b.AddParameter("scope", scopesCombined);
             b.AddParameter("redirect_uri", redirectUri);
             b.AddParameter("state", state);
-            
-            // Application.OpenURL(b.Uri);
+
+#if UNITY_EDITOR
             System.Diagnostics.Process.Start(b.Uri);
+#else
+            Application.OpenURL(b.Uri);
+#endif
         }
         public static int GetRandomUnusedPort()
         {

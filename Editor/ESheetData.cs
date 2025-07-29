@@ -27,11 +27,11 @@ namespace Mobge.Sheets {
     }
     [CustomPropertyDrawer(typeof(SheetData), true)]
     public partial class ESheetData : PropertyDrawer {
-        public const string c_defaultSettingsPath = "Assets/Editor/Resources/" + GoogleSheetCredentials.c_defaultAssetName + ".asset";
+        public const string c_defaultSettingsPath = "Assets/Resources/" + GoogleSheetCredentials.c_defaultAssetName + ".asset";
 
         [MenuItem("Window/Mobge/Google Sheet Settings")]
         public static void SheetSettings() {
-            var a = AssetDatabase.LoadAssetAtPath<GoogleSheetCredentials>(c_defaultSettingsPath);
+            var a = GoogleSheetCredentials.Instance;
             if (a == null) {
                 string path = c_defaultSettingsPath;
                 var paths = path.Split("/");
@@ -44,7 +44,7 @@ namespace Mobge.Sheets {
                 AssetDatabase.CreateAsset(ins, c_defaultSettingsPath);
                 AssetDatabase.SaveAssets();
                 AssetDatabase.Refresh();
-                a = AssetDatabase.LoadAssetAtPath<GoogleSheetCredentials>(c_defaultSettingsPath);
+                a = GoogleSheetCredentials.Instance;
             }
             Selection.activeObject = a;
         }
