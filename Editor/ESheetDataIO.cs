@@ -402,7 +402,15 @@ namespace Mobge.Sheets {
                     var field = fields[fieldIndex];
                     var fieldProperty = FindFieldProperty(rowProperty, field);
                     string cellValue = ConvertToString(fieldProperty, field, ctx.mappings[fieldIndex], ctx);
-                    dataRow.Add(cellValue);
+                    if (double.TryParse(cellValue, out var d))
+                    {
+                        JSONData dd = new JSONData(d);
+                        dataRow.Add(dd);
+                    }
+                    else
+                    {
+                        dataRow.Add(cellValue);
+                    }
                 }
 
                 root.Add(dataRow);
