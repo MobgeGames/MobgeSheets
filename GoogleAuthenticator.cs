@@ -79,7 +79,7 @@ namespace Mobge.DoubleKing {
                 _activeListener.Stop();
             }
         }
-        private async Task<bool> RequestAccessToken()
+        public async Task<bool> RequestAccessToken()
         {
             OAuthListener l = new();
             _activeListener = l;
