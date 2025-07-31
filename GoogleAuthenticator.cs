@@ -14,10 +14,15 @@ namespace Mobge.DoubleKing {
         public const string c_authorizationEndpoint = "https://accounts.google.com/o/oauth2/v2/auth";
         public const string c_tokenEndpoint = "https://oauth2.googleapis.com/token";
         private static GoogleAuthenticator s_instance;
+        private OAuthListener _activeListener;
+        private string _settedCode;
 
-        public static GoogleAuthenticator Instance {
-            get {
-                if(s_instance == null) {
+        public static GoogleAuthenticator Instance
+        {
+            get
+            {
+                if (s_instance == null)
+                {
                     s_instance = new GoogleAuthenticator(GoogleSheetCredentials.Instance);
                 }
                 return s_instance;
@@ -65,8 +70,19 @@ namespace Mobge.DoubleKing {
             }
             return _accessParams.accessToken;
         }
-        private async Task<bool> RequestAccessToken() {
+        
+        public void SetUrlCode(string token)
+        {
+            _settedCode = token;
+            if (_activeListener != null)
+            {
+                _activeListener.Stop();
+            }
+        }
+        private async Task<bool> RequestAccessToken()
+        {
             OAuthListener l = new();
+            _activeListener = l;
 
             l.StartListening(300, out string redurectUri);
             // Debug.Log("redirect uri: " + redurectUri);
@@ -74,35 +90,59 @@ namespace Mobge.DoubleKing {
             string state = "mbs_" + new System.Random().Next(0, int.MaxValue).ToString();
             ExecuteAccessTokenRequest(state, redurectUri);
             var context = await l.GetContextAsync();
-            if(context == null) {
+            if (context == null)
+            {
                 Debug.Log("Request Access Token: Timeout");
             }
-            else {
+            else
+            {
                 var outStream = context.Response.OutputStream;
                 var outBytes = GoogleSheetCredentials.AccessGrantedPageContent;
                 await outStream.WriteAsync(outBytes, 0, outBytes.Length);
                 outStream.Close();
             }
             l.Stop();
+            if (!TryGetCode(context, state, out string code))
+            {
+                code = _settedCode;
+                _settedCode = null;
+                if (string.IsNullOrEmpty(code))
+                {
+                    return false;
+                }
+            }
             
+            return await TryRefreshAccessToken("authorization_code", "code", code, redurectUri);
+        }
+        private bool TryGetCode(HttpListenerContext context, string state, out string code)
+        {
+            code = default;
+            if (context == null)
+            {
+                return false;
+            }
             string error = context.Request.QueryString.Get("error");
-            if(error is object) {
+            if (error is object)
+            {
                 Debug.LogError(error);
                 return false;
             }
-            string code = context.Request.QueryString.Get("code");
+            code = context.Request.QueryString.Get("code");
             string responseState = context.Request.QueryString.Get("state");
-            if (code is null || responseState is null) {
+            if (code is null || responseState is null)
+            {
                 Debug.LogError($"Malformed authorization response. {context.Request.QueryString}");
                 return false;
             }
-            if(responseState != state) {
+            if (responseState != state)
+            {
                 Debug.LogError("State mismatch");
                 return false;
             }
-            return await TryRefreshAccessToken("authorization_code", "code", code, redurectUri);
+            return true;
         }
-        private void ExecuteAccessTokenRequest(string state, string redirectUri) {
+        private void ExecuteAccessTokenRequest(string state, string redirectUri)
+        {
             UriBuilder b = new();
             b.Reset(c_authorizationEndpoint);
             b.AddParameter("response_type", "code");
@@ -111,9 +151,11 @@ namespace Mobge.DoubleKing {
             b.AddParameter("client_id", _credentials.clientId);
             var scopes = _credentials.scopes;
             string scopesCombined = "";
-            for(int i = 0; i < scopes.Length; i++) {
+            for (int i = 0; i < scopes.Length; i++)
+            {
                 string next = scopes[i];
-                if(i > 0) {
+                if (i > 0)
+                {
                     next = "%20" + next;
                 }
                 scopesCombined += next;
@@ -136,8 +178,9 @@ namespace Mobge.DoubleKing {
             listener.Stop();
             return port;
         }
-        private async Task<bool> TryRefreshAccessToken(string grandType, string codeKey, string code, string redirectUri = null) {
-            
+        private async Task<bool> TryRefreshAccessToken(string grandType, string codeKey, string code, string redirectUri = null)
+        {
+
             HttpWebRequest r = (HttpWebRequest)WebRequest.Create(c_tokenEndpoint);
             r.Method = "POST";
             r.ContentType = "application/x-www-form-urlencoded";
@@ -147,29 +190,35 @@ namespace Mobge.DoubleKing {
             b.AddParameter("client_id", _credentials.clientId);
             b.AddParameter("client_secret", _credentials.clientSecret);
             b.AddParameter("grant_type", grandType);
-            if(!string.IsNullOrEmpty(redirectUri)) {
+            if (!string.IsNullOrEmpty(redirectUri))
+            {
                 b.AddParameter("redirect_uri", redirectUri);
             }
             // Debug.Log("payload: " + b.Uri);
             var bodyBytes = Encoding.UTF8.GetBytes(b.Uri);
             r.ContentLength = bodyBytes.Length;
-            using(var stream = r.GetRequestStream()) {
+            using (var stream = r.GetRequestStream())
+            {
                 await stream.WriteAsync(bodyBytes, 0, bodyBytes.Length);
             }
             WebResponse response;
-            try{
+            try
+            {
                 response = await r.GetResponseAsync();
             }
-            catch (Exception e){
+            catch (Exception e)
+            {
                 Debug.LogError(e);
                 _accessParams = default;
                 SaveAccessParams();
                 return false;
             }
-            using(StreamReader reader = new StreamReader(response.GetResponseStream())) {
+            using (StreamReader reader = new StreamReader(response.GetResponseStream()))
+            {
                 var result = SimpleJSON.JSON.Parse(await reader.ReadToEndAsync());
                 _accessParams.accessToken = result["access_token"];
-                if(string.IsNullOrEmpty(_accessParams.accessToken)) {
+                if (string.IsNullOrEmpty(_accessParams.accessToken))
+                {
                     _accessParams = default;
                     SaveAccessParams();
                     return false;
