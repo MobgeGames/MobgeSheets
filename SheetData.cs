@@ -160,6 +160,11 @@ namespace Mobge.Sheets {
                 parentFields.Push(fieldInfo);
                 var att = fieldInfo.GetCustomAttribute<SeperateColumns>();
                 if (att != null) {
+                    Type childType = fieldInfo.FieldType;
+                    if (childType.IsArray)
+                    {
+                        childType = childType.GetElementType();
+                    }
                     TryGetFields(fieldInfo.FieldType, parentFields, fields);
                 }
                 else {
@@ -330,7 +335,24 @@ namespace Mobge.Sheets {
             int index = ColumnToIndex(column);
             return IndexToColumn(index + offset);
         }
-        public string GetRange(int2 size) {
+        public static CellId operator +(CellId c1, int2 offset)
+        {
+            CellId c = c1;
+            if (offset.x > 0)
+            {
+                int ci = ColumnToIndex(c.column);
+                ci += offset.x;
+                if (ci < 0)
+                {
+                    throw new InvalidOperationException();
+                }
+                c.column = IndexToColumn(ci);
+            }
+            c.row += offset.y;
+            return c;
+        } 
+        public string GetRange(int2 size)
+        {
             string range = column + row;
             range += ":";
             range += CellId.Add(column, size.x - 1);
