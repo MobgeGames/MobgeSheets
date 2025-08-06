@@ -29,7 +29,7 @@ namespace Mobge.Sheets {
         // }
     }
     public abstract class SheetData {
-        public static char[] s_trimChars = new char[]{' ', '\r', '\n'};
+        public static char[] s_trimChars = new char[] { ' ', '\r', '\n' };
         public GoogleSheet googleSheet;
         public CellId tableStart;
         public MappingEntry[] mappings;
@@ -50,7 +50,7 @@ namespace Mobge.Sheets {
             public abstract object GetObjectRaw(string key);
             public abstract bool ValidateValue(object value);
             public abstract string GetKeyFromObject(object obj);
-            
+
         }
 
         [Serializable]
@@ -76,7 +76,7 @@ namespace Mobge.Sheets {
                 return false;
             }
             public virtual bool ValidateValueT(T value) {
-                if(value is UnityEngine.Object uo) {
+                if (value is UnityEngine.Object uo) {
                     return uo != null;
                 }
                 return value != null;
@@ -97,9 +97,9 @@ namespace Mobge.Sheets {
             public Pair[] pairs;
             public override T GetObject(string key) {
                 int count = pairs.GetLength();
-                for(int i = 0; i < count; i++) {
+                for (int i = 0; i < count; i++) {
                     var p = pairs[i];
-                    if(p.Key == key) {
+                    if (p.Key == key) {
                         return p.value;
                     }
                 }
@@ -107,9 +107,9 @@ namespace Mobge.Sheets {
             }
             public override void GetAllKeys(List<string> keys) {
                 int count = pairs.GetLength();
-                for(int i = 0; i < count; i++) {
+                for (int i = 0; i < count; i++) {
                     keys.Add(pairs[i].Key);
-                } 
+                }
             }
             [Serializable]
             public struct Pair {
@@ -117,10 +117,10 @@ namespace Mobge.Sheets {
                 public T value;
                 public string Key {
                     get {
-                        if(!string.IsNullOrEmpty(key)) {
+                        if (!string.IsNullOrEmpty(key)) {
                             return key;
                         }
-                        if(value is UnityEngine.Object o) {
+                        if (value is UnityEngine.Object o) {
                             return o.name;
                         }
                         return "" + value;
@@ -129,10 +129,8 @@ namespace Mobge.Sheets {
             }
         }
         [Serializable]
-        public class EnumMapping<T> : AMapping<T> where T : Enum
-        {
-            public override void GetAllKeys(List<string> keys)
-            {
+        public class EnumMapping<T> : AMapping<T> where T : Enum {
+            public override void GetAllKeys(List<string> keys) {
                 var names = Enum.GetNames(typeof(T));
                 keys.AddRange(names);
             }
@@ -146,8 +144,7 @@ namespace Mobge.Sheets {
                 }
             }
 
-            public override bool ValidateValueT(T value)
-            {
+            public override bool ValidateValueT(T value) {
                 return Enum.IsDefined(typeof(T), value);
             }
         }
@@ -161,8 +158,7 @@ namespace Mobge.Sheets {
                 var att = fieldInfo.GetCustomAttribute<SeperateColumns>();
                 if (att != null) {
                     Type childType = fieldInfo.FieldType;
-                    if (childType.IsArray)
-                    {
+                    if (childType.IsArray) {
                         childType = childType.GetElementType();
                     }
                     TryGetFields(fieldInfo.FieldType, parentFields, fields);
@@ -238,60 +234,6 @@ namespace Mobge.Sheets {
         [Serializable]
         public class ObjectMapping : PairMapping<UnityEngine.Object> {
 
-        }
-        [Serializable]
-        public class ItemMapping : AMapping<ItemSet.ItemPath> {
-            public ItemSet.ItemPath defaultValue;
-            public ItemSet[] sets;
-            public bool preferShortForm = true;
-            public override bool ValidateValueT(ItemSet.ItemPath value) {
-                return value.IsValid;
-            }
-            public override ItemSet.ItemPath GetObject(string key) {
-                var values = key.Split(':');
-                if(values.Length == 0) {
-                    return defaultValue;
-                }
-                string setName = null;
-                string itemName = values[0];
-                if(values.Length >= 2) {
-                    setName = values[0];
-                    setName = setName.Trim(s_trimChars);
-                    itemName = values[1];
-
-                }
-                itemName = itemName.Trim(s_trimChars);
-                for(int i = 0; i < sets.Length; i++) {
-                    var set = sets[i];
-                    if(set == null || (!string.IsNullOrEmpty(setName) && setName != set.name)) {
-                        continue;
-                    }
-                    
-                    foreach(var pp in set.items) {
-                        if(pp.Value.name == itemName) {
-                            return new ItemSet.ItemPath(set, pp.Key);
-                        }
-                    }
-                }
-                return defaultValue;
-            }
-            public override void GetAllKeys(List<string> keys) {
-                int count = sets.GetLength();
-                for(int i = 0; i < count; i++) {
-                    var set = sets[i];
-                    if(set == null){
-                        continue;
-                    }
-                    foreach(var item in set.items) {
-                        if(preferShortForm) {
-                            keys.Add(item.Value.name);
-                        }
-                        else {
-                            keys.Add(set.name + ": " + item.Value.name);
-                        }
-                    }
-                }
-            }
         }
     }
     [Serializable]
