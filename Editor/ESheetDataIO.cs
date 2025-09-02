@@ -70,7 +70,7 @@ namespace Mobge.Sheets {
 
 
 
-        private static async Task UpdateDropdownsCommon(SheetData go, int rowCount, CellContext ctx) {
+        private static async Task UpdateDropdownsCommon(SheetData go, int rowCount) {
             if (go.mappings.IsNullOrEmpty()) {
                 return;
             }
@@ -86,13 +86,9 @@ namespace Mobge.Sheets {
                 if (mapping.mapping == null) continue;
 
                 int columnOffset = -1;
-                int fieldOffset = -1;
-                for (int f = 0; f < fields.Length; f++)
-                {
-                    if (fields[f].Name == mapping.fieldName)
-                    {
-                        fieldOffset = f;
-                        columnOffset = ctx.columnIndexes[f];
+                for (int f = 0; f < fields.Length; f++) {
+                    if (fields[f].Name == mapping.fieldName) {
+                        columnOffset = f;
                         break;
                     }
                 }
@@ -109,7 +105,7 @@ namespace Mobge.Sheets {
                 dd.start.x += columnOffset;
                 dd.start.y += 1; // Header
                 dd.size = new int2(1, rowCount);
-                dd.multiSelect = fields[fieldOffset].isArray;
+                dd.multiSelect = fields[columnOffset].isArray;
 
                 dropdowns.Add(dd);
             }
@@ -161,62 +157,49 @@ namespace Mobge.Sheets {
             }
             return ctx;
         }
-        private static void CreateReportHeader(SerializedProperty p, string label, CellContext ctx, int rowCount) {
-            ctx.report.Append(label);
-            ctx.report.Append(": (");
-            if (p != null)
-            {
-                ctx.report.Append(p.serializedObject.targetObject.name);
-                ctx.report.Append(", ");
-                ctx.report.Append(p.propertyPath);
-            }
-            else
-            {
-                ctx.report.Append("Unknown");
-            }
-            ctx.report.Append(")");
-
-            ctx.report.AppendLine(" Data count: " + rowCount);
-        }
-        public static async Task ReadFromSheet(SerializedProperty p, SheetData go, string range)
-        {
+        public static async Task ReadFromSheet(SerializedProperty p, SheetData go, string range) {
             var result = await go.googleSheet.GetValues(Dimension.ROWS, range);
             var nodes = result[0];
             int rowCount = nodes.Count - 1;
             var header = nodes[0];
             CellContext ctx = FindMapping(go, header);
-            CreateReportHeader(p, "Updating Sheet", ctx, rowCount);
+            ctx.report.Append("Updating Sheet: (");
+            if (p != null) {
+                ctx.report.Append(p.serializedObject.targetObject.name);
+                ctx.report.Append(", ");
+                ctx.report.Append(p.propertyPath);
+            }
+            else {
+                ctx.report.Append("Unknown");
+            }
+            ctx.report.Append(")");
+
+            ctx.report.AppendLine(" Data count: " + rowCount);
 
             object[] data = new object[rowCount];
-            for (int i = 0; i < rowCount; i++)
-            {
+            for (int i = 0; i < rowCount; i++) {
                 var rowCells = nodes[i + 1].AsArray;
                 object rowData = Activator.CreateInstance(go.RowType);
-                for (int iField = 0; iField < ctx.fieldCount; iField++)
-                {
+                for (int iField = 0; iField < ctx.fieldCount; iField++) {
                     ctx.columnIndex = ctx.columnIndexes[iField];
-                    if (ctx.columnIndex < 0)
-                    {
+                    if (ctx.columnIndex < 0) {
                         continue;
                     }
                     ctx.rowIndex = i;
                     var field = ctx.fields[iField];
                     var textValue = rowCells[ctx.columnIndex].Value;
                     object value;
-                    if (field.isArray)
-                    {
+                    if (field.isArray) {
                         var values = textValue.Split(',');
                         var arr = Array.CreateInstance(field.type, values.Length);
-                        for (int v = 0; v < values.Length; v++)
-                        {
+                        for (int v = 0; v < values.Length; v++) {
                             string arrValue = values[v];
                             var o = ConvertToObject(arrValue, field, ctx.mappings[iField], ctx);
                             arr.SetValue(o, v);
                         }
                         value = arr;
                     }
-                    else
-                    {
+                    else {
                         value = ConvertToObject(textValue, field, ctx.mappings[iField], ctx);
                     }
                     field.SetValue(rowData, value);
@@ -225,15 +208,13 @@ namespace Mobge.Sheets {
                 data[i] = rowData;
             }
 
-            if (p != null)
-            {
+            if (p != null) {
                 Undo.RecordObject(p.serializedObject.targetObject, "Update data from sheet");
             }
 
             go.UpdateData(data);
 
-            if (p != null)
-            {
+            if (p != null) {
                 p.WriteObject(go);
 
                 p.serializedObject.ApplyModifiedProperties();
@@ -262,11 +243,8 @@ namespace Mobge.Sheets {
             }
             return value;
         }
-        public static async Task<int2> DetectSize(SheetData go) {
-            return (await DetectSizeAndHeader(go)).Item1;
-        }
 
-        public static async Task<(int2, JSONArray)> DetectSizeAndHeader(SheetData go) {
+        public static async Task<int2> DetectSize(SheetData go) {
             var start = go.tableStart;
             if (string.IsNullOrEmpty(start.column)) {
                 start.column = "A";
@@ -277,30 +255,20 @@ namespace Mobge.Sheets {
             string rangeH = start.column + start.row + ':' + start.row;
             string rangeV = start.column + start.row + ':' + start.column;
             var nodes = await go.googleSheet.GetValues(Dimension.ROWS, rangeH, rangeV);
-            
             if (nodes.IsNullOrEmpty()) {
                 return default;
             }
             var nodeH = nodes[0];
             var nodeV = nodes[1];
             int2 size = new int2(1, 1);
-            JSONArray header = null;
-            if (nodeH.Count > 0)
-            {
-                var valsH = nodeH[0].AsArray;
-                header = new JSONArray();
-                if(valsH.Count > 0) {
-                    header.Add(valsH[0]);
-                    for (int i = 1; i < valsH.Count; i++)
-                    {
-                        if (string.IsNullOrEmpty(valsH[i].Value))
-                        {
-                            break;
-                        }
-                        size.x++;
-                        header.Add(valsH[i]);
 
+            if (nodeH.Count > 0) {
+                var valsH = nodeH[0].AsArray;
+                for (int i = 1; i < valsH.Count; i++) {
+                    if (string.IsNullOrEmpty(valsH[i].Value)) {
+                        break;
                     }
+                    size.x++;
                 }
             }
             for (int i = 1; i < nodeV.Count; i++) {
@@ -311,7 +279,7 @@ namespace Mobge.Sheets {
             }
 
 
-            return (size, header);
+            return size;
         }
 
         private void UpdateSheetField(Meta meta, SerializedProperty p) {
@@ -357,17 +325,15 @@ namespace Mobge.Sheets {
             }
             root[0] = row;
             await _go.googleSheet.PutValues(Dimension.ROWS, root, range);
-            var ctx = FindMapping(_go, row);
-            await UpdateDropdownsCommon(_go, rowCount, ctx);
+            await UpdateDropdownsCommon(_go, rowCount);
         }
         private async void TryUpdateDropdowns(SheetData go) {
-            (var size, var header) = await DetectSizeAndHeader(go);
+            int2 size = await DetectSize(go);
             if (size.y < 2) {
                 Debug.LogError("Table has no rows.");
                 return;
             }
-            var ctx = FindMapping(go, header);
-            await UpdateDropdownsCommon(go, size.y - 1, ctx);
+            await UpdateDropdownsCommon(go, size.y - 1);
 
         }
 
@@ -389,118 +355,124 @@ namespace Mobge.Sheets {
             await WriteToSheet(p, go);
         }
 
-        public static async Task WriteToSheet(SerializedProperty p, SheetData go)
-        {
-            if (!SheetData.TryGetFields(go.RowType, out var fields))
-            {
+        public static async Task WriteToSheet(SerializedProperty p, SheetData go) {
+            if (!SheetData.TryGetFields(go.RowType, out var fields)) {
                 Debug.LogError("No serializable fields found in data type.");
                 return;
             }
-            (int2 size, JSONArray header) = await DetectSizeAndHeader(go);
-            
-            var dataProperty = p.FindPropertyRelative("data");
-            int totalRows = dataProperty.arraySize;
-            int2 writeSize = new int2(size.x, totalRows);
-            var start = go.tableStart + new int2(0, 1);
-            string range = start.GetRange(writeSize);
 
-            var contentData = await go.googleSheet.GetValues(Dimension.ROWS, range);
-            if (contentData[0].Count > 0)
-            {
+            int2 size = await DetectSize(go);
+            if (size.y > 1) {
                 bool proceed = EditorUtility.DisplayDialog(
                     "Warning",
                     "There is existing data in Google Sheets. Continuing will delete existing data. Do you want to continue?",
                     "Yes",
                     "No"
                 );
-                if (!proceed)
-                {
+                if (!proceed) {
                     Debug.Log("Operation cancelled.");
                     return;
                 }
             }
 
-            if (dataProperty == null || dataProperty.arraySize == 0)
-            {
+            var dataProperty = p.FindPropertyRelative("data");
+            if (dataProperty == null || dataProperty.arraySize == 0) {
                 Debug.LogError("No data found in Unity to export.");
                 return;
             }
-            if (size.x == 0)
-            {
-                Debug.LogError("Header is not found.");
-                return;
+
+            CellContext ctx = CreateWriteContext(go, fields);
+            if (ctx.report.Length > 0) {
+                Debug.LogWarning("Mapping warnings:\n" + ctx.report.ToString());
             }
 
-            CellContext ctx = FindMapping(go, header);
-            CreateReportHeader(p, "Writing To Sheet", ctx, dataProperty.arraySize);
-
             JSONArray root = new JSONArray();
-            for (int rowIndex = 0; rowIndex < dataProperty.arraySize; rowIndex++)
-            {
+
+            JSONArray headerRow = new JSONArray();
+            for (int i = 0; i < fields.Length; i++) {
+                headerRow.Add(fields[i].Name);
+            }
+            root.Add(headerRow);
+
+            for (int rowIndex = 0; rowIndex < dataProperty.arraySize; rowIndex++) {
                 var rowProperty = dataProperty.GetArrayElementAtIndex(rowIndex);
                 JSONArray dataRow = new JSONArray();
-                
-                for (int fieldIndex = 0; fieldIndex < fields.Length; fieldIndex++)
-                {
+
+                for (int fieldIndex = 0; fieldIndex < fields.Length; fieldIndex++) {
                     var field = fields[fieldIndex];
-                    ctx.columnIndex = ctx.columnIndexes[fieldIndex];
-                    if (ctx.columnIndex < 0)
-                    {
-                        continue;
-                    }
-                    while (dataRow.Count <= ctx.columnIndex)
-                    {
-                        dataRow.Add("");
-                    }
                     var fieldProperty = FindFieldProperty(rowProperty, field);
                     string cellValue = ConvertToString(fieldProperty, field, ctx.mappings[fieldIndex], ctx);
-
                     if (double.TryParse(cellValue, out var d))
                     {
                         JSONData dd = new JSONData(d);
-                        dataRow[ctx.columnIndex] = dd;
+                        dataRow.Add(dd);
                     }
                     else
                     {
-                        dataRow[ctx.columnIndex] = cellValue;
+                        dataRow.Add(cellValue);
                     }
                 }
 
                 root.Add(dataRow);
             }
 
-            
+            int totalRows = dataProperty.arraySize + 1; // +1 for header
+            int2 writeSize = new int2(fields.Length, totalRows);
+            string range = go.tableStart.GetRange(writeSize);
 
             await go.googleSheet.PutValues(Dimension.ROWS, root, range);
 
-            await UpdateDropdownsCommon(go, dataProperty.arraySize, ctx);
+            await UpdateDropdownsCommon(go, dataProperty.arraySize);
 
-            
-            ctx.report.AppendLine($"{dataProperty.arraySize} rows of data exported from Unity to Google Sheets.");
+            StringBuilder finalReport = new StringBuilder();
+            finalReport.AppendLine($"{dataProperty.arraySize} rows of data exported from Unity to Google Sheets.");
 
-            if (ctx.emptyFields.Count > 0)
-            {
-                ctx.report.AppendLine($"Fields without mapping ({ctx.emptyFields.Count}): {string.Join(", ", ctx.emptyFields)}");
+            if (ctx.emptyFields.Count > 0) {
+                finalReport.AppendLine($"Fields without mapping ({ctx.emptyFields.Count}): {string.Join(", ", ctx.emptyFields)}");
             }
 
-            if (ctx.emptyValueCount > 0)
-            {
-                ctx.report.AppendLine($"Total {ctx.emptyValueCount} cells written with empty values.");
+            if (ctx.emptyValueCount > 0) {
+                finalReport.AppendLine($"Total {ctx.emptyValueCount} cells written with empty values.");
             }
 
-            Debug.Log(ctx.report, p?.serializedObject.targetObject);
+            Debug.Log(finalReport.ToString(), p?.serializedObject.targetObject);
         }
-        
-        private static SerializedProperty FindFieldProperty(SerializedProperty rowProperty, Field field)
-        {
+
+        private static CellContext CreateWriteContext(SheetData go, Field[] fields) {
+            CellContext ctx = default;
+            ctx.sheetData = go;
+            ctx.report = new StringBuilder();
+            ctx.fields = fields;
+            ctx.fieldCount = fields.Length;
+            ctx.mappings = new AMapping[ctx.fieldCount];
+            ctx.emptyValueCount = 0;
+            ctx.emptyFields = new List<string>();
+
+            ctx.columnIndexes = new int[ctx.fieldCount];
+            ctx.columnIndex = 0;
+            ctx.rowIndex = 0;
+
+            PopulateMappings(go, fields, ctx.mappings);
+
+            for (int i = 0; i < ctx.fieldCount; i++) {
+                var field = ctx.fields[i];
+
+                if (!IsPrimitive(field.type) && ctx.mappings[i] == null) {
+                    ctx.report.AppendLine($"No mapping found for field '{field.Name}', empty value will be written.");
+                    ctx.emptyFields.Add(field.Name);
+                }
+            }
+
+            return ctx;
+        }
+
+        private static SerializedProperty FindFieldProperty(SerializedProperty rowProperty, Field field) {
             SerializedProperty current = rowProperty;
 
             string[] pathParts = field.Name.Split('.');
-            for (int i = 0; i < pathParts.Length; i++)
-            {
+            for (int i = 0; i < pathParts.Length; i++) {
                 current = current.FindPropertyRelative(pathParts[i]);
-                if (current == null)
-                {
+                if (current == null) {
                     break;
                 }
             }
@@ -519,9 +491,8 @@ namespace Mobge.Sheets {
                     var elementProperty = property.GetArrayElementAtIndex(i);
                     string elementValue = ConvertSingleValueToString(elementProperty, field.type, mapping, ctx);
                     arrayValues.Add(elementValue);
-                    
                 }
-                return string.Join(", ", arrayValues);
+                return string.Join(",", arrayValues);
             }
             else {
                 return ConvertSingleValueToString(property, field.type, mapping, ctx);
