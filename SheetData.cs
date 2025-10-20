@@ -289,7 +289,6 @@ namespace Mobge.Sheets {
         }
                 [Serializable]
         public class ItemMapping : AMapping<ItemSet.ItemPath> {
-            public ItemSet.ItemPath defaultValue;
             public ItemSet[] sets;
             public bool preferShortForm = true;
             public override bool ValidateValueT(ItemSet.ItemPath value) {
@@ -298,7 +297,7 @@ namespace Mobge.Sheets {
             public override ItemSet.ItemPath GetObject(string key) {
                 var values = key.Split(':');
                 if(values.Length == 0) {
-                    return defaultValue;
+                    throw new Exception("ItemMapping: key is empty");
                 }
                 string setName = null;
                 string itemName = values[0];
@@ -321,7 +320,7 @@ namespace Mobge.Sheets {
                         }
                     }
                 }
-                return defaultValue;
+                throw new Exception($"ItemMapping: Item not found: {key}");
             }
             public override void GetAllKeys(List<string> keys) {
                 int count = sets.GetLength();
