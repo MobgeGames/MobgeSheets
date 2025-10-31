@@ -9,11 +9,11 @@ namespace Mobge.Sheets.Test {
         [Serializable]
         public struct Character {
             public string name;
-            public int score;
+            public int[] score;
             public Sprite icon;
             public ItemSet.ItemPath weapon;
             [SeperateColumns] public Nested1 nested;
-            [SeperateColumns] public Vector3 vector;
+            [SeperateColumns] public Vector3[] vector;
         }
         [Serializable]
         public class Nested1 {

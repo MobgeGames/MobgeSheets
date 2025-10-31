@@ -28,9 +28,8 @@ namespace Mobge.Sheets {
 
         // }
     }
-    public abstract class SheetData
-    {
-        public static char[] s_trimChars = new char[] { ' ', '\r', '\n' };
+    public abstract class SheetData {
+        public static char[] s_trimChars = new char[]{' ', '\r', '\n'};
         public GoogleSheet googleSheet;
         public CellId tableStart;
         public MappingEntry[] mappings;
@@ -40,113 +39,88 @@ namespace Mobge.Sheets {
 
 
         [Serializable]
-        public struct MappingEntry
-        {
+        public struct MappingEntry {
             public string fieldName;
             [SerializeReference] public AMapping mapping;
             public bool IsValid => mapping != null;
         }
 
-        public abstract class AMapping
-        {
+        public abstract class AMapping {
             public abstract void GetAllKeys(List<string> keys);
             public abstract object GetObjectRaw(string key);
             public abstract bool ValidateValue(object value);
             public abstract string GetKeyFromObject(object obj);
-
+            
         }
 
         [Serializable]
-        public abstract class AMapping<T> : AMapping
-        {
+        public abstract class AMapping<T> : AMapping {
             public abstract T GetObject(string key);
-            public virtual bool Compare(T t1, T t2)
-            {
+            public virtual bool Compare(T t1, T t2) {
                 return t1.Equals(t2);
             }
-            public string GetKey(T o)
-            {
+            public string GetKey(T o) {
                 List<string> keys = new();
                 GetAllKeys(keys);
-                for (int i = 0; i < keys.Count; i++)
-                {
-                    if (Compare(o, GetObject(keys[i])))
-                    {
+                for (int i = 0; i < keys.Count; i++) {
+                    if (Compare(o, GetObject(keys[i]))) {
                         return keys[i];
                     }
                 }
                 return "";
             }
-            public override bool ValidateValue(object value)
-            {
-                if (value is T t)
-                {
+            public override bool ValidateValue(object value) {
+                if (value is T t) {
                     return ValidateValueT(t);
                 }
                 return false;
             }
-            public virtual bool ValidateValueT(T value)
-            {
-                if (value is UnityEngine.Object uo)
-                {
+            public virtual bool ValidateValueT(T value) {
+                if(value is UnityEngine.Object uo) {
                     return uo != null;
                 }
                 return value != null;
             }
-            public override object GetObjectRaw(string key)
-            {
+            public override object GetObjectRaw(string key) {
                 return GetObject(key);
             }
-            public override string GetKeyFromObject(object obj)
-            {
-                if (obj is T t)
-                {
+            public override string GetKeyFromObject(object obj) {
+                if (obj is T t) {
                     return GetKey(t);
                 }
                 return "";
             }
         }
         [Serializable]
-        public class PairMapping<T> : AMapping<T>
-        {
+        public class PairMapping<T> : AMapping<T> {
             public T defaultValue;
             public Pair[] pairs;
-            public override T GetObject(string key)
-            {
+            public override T GetObject(string key) {
                 int count = pairs.GetLength();
-                for (int i = 0; i < count; i++)
-                {
+                for(int i = 0; i < count; i++) {
                     var p = pairs[i];
-                    if (p.Key == key)
-                    {
+                    if(p.Key == key) {
                         return p.value;
                     }
                 }
                 return defaultValue;
             }
-            public override void GetAllKeys(List<string> keys)
-            {
+            public override void GetAllKeys(List<string> keys) {
                 int count = pairs.GetLength();
-                for (int i = 0; i < count; i++)
-                {
+                for(int i = 0; i < count; i++) {
                     keys.Add(pairs[i].Key);
-                }
+                } 
             }
             [Serializable]
-            public struct Pair
-            {
+            public struct Pair {
                 public string key;
                 public T value;
-                public string Key
-                {
-                    get
-                    {
-                        if (!string.IsNullOrEmpty(key))
-                        {
+                public string Key {
+                    get {
+                        if(!string.IsNullOrEmpty(key)) {
                             return key;
                         }
-                        if (value is UnityEngine.Object o)
-                        {
+                        if(value is UnityEngine.Object o) {
                             return o.name;
                         }
                         return "" + value;
@@ -163,12 +137,10 @@ namespace Mobge.Sheets {
                 keys.AddRange(names);
             }
 
-            public override T GetObject(string key)
-            {
+            public override T GetObject(string key) {
                 if (Enum.TryParse(typeof(T), key, out var result) && result is T value)
                     return value;
-                else
-                {
+                else {
                     Debug.LogError($"Key: {key} can't parsed, return default enum value");
                     return default;
                 }
@@ -179,19 +151,15 @@ namespace Mobge.Sheets {
                 return Enum.IsDefined(typeof(T), value);
             }
         }
-        private static bool TryGetFields(Type type, Stack<FieldInfo> parentFields, List<Field> fields)
-        {
-            if (!BinarySerializer.TryGetFields(type, out var ffs))
-            {
+        private static bool TryGetFields(Type type, Stack<FieldInfo> parentFields, List<Field> fields) {
+            if (!BinarySerializer.TryGetFields(type, out var ffs)) {
                 return false;
             }
-            for (int i = 0; i < ffs.Length; i++)
-            {
+            for (int i = 0; i < ffs.Length; i++) {
                 var fieldInfo = ffs[i];
                 parentFields.Push(fieldInfo);
                 var att = fieldInfo.GetCustomAttribute<SeperateColumns>();
-                if (att != null)
-                {
+                if (att != null) {
                     Type childType = fieldInfo.FieldType;
                     if (childType.IsArray)
                     {
@@ -199,21 +167,18 @@ namespace Mobge.Sheets {
                     }
                     TryGetFields(fieldInfo.FieldType, parentFields, fields);
                 }
-                else
-                {
+                else {
                     fields.Add(new Field(parentFields.Reverse().ToArray()));
                 }
                 parentFields.Pop();
             }
             return true;
         }
-        public static bool TryGetFields(Type type, out Field[] fields)
-        {
+        public static bool TryGetFields(Type type, out Field[] fields) {
             List<Field> r = new();
             Stack<FieldInfo> parentFields = new();
             TryGetFields(type, parentFields, r);
-            if (r.Count == 0)
-            {
+            if (r.Count == 0) {
                 fields = null;
                 return false;
             }
@@ -221,55 +186,44 @@ namespace Mobge.Sheets {
             return true;
         }
 
-        public struct Field
-        {
+        public struct Field {
             public Type type;
             private FieldInfo[] _fieldInfos;
             public bool isArray;
             public string Name { get; private set; }
-            public void SetValue(object root, object value)
-            {
+            public void SetValue(object root, object value) {
                 SetValue(root, value, 0);
             }
-            private void SetValue(object obj, object value, int index)
-            {
+            private void SetValue(object obj, object value, int index) {
                 var fInfo = _fieldInfos[index];
-                if (index == _fieldInfos.Length - 1)
-                {
+                if (index == _fieldInfos.Length - 1) {
                     fInfo.SetValue(obj, value);
                     return;
                 }
                 var fieldValue = fInfo.GetValue(obj);
-                if (fieldValue == null)
-                {
+                if (fieldValue == null) {
                     fieldValue = Activator.CreateInstance(fInfo.FieldType);
                 }
                 SetValue(fieldValue, value, index + 1);
                 fInfo.SetValue(obj, fieldValue);
             }
-            public Field(FieldInfo[] f)
-            {
+            public Field(FieldInfo[] f) {
                 this._fieldInfos = f;
                 Name = GetName(f);
                 var t = f[^1].FieldType;
                 isArray = t.IsArray;
-                if (isArray)
-                {
+                if (isArray) {
                     type = t.GetElementType();
                 }
-                else
-                {
+                else {
                     type = t;
                 }
             }
 
-            private static string GetName(FieldInfo[] _fieldInfos)
-            {
+            private static string GetName(FieldInfo[] _fieldInfos) {
                 string s = "";
-                for (int i = 0; i < _fieldInfos.Length; i++)
-                {
-                    if (i != 0)
-                    {
+                for (int i = 0; i < _fieldInfos.Length; i++) {
+                    if (i != 0) {
                         s += ".";
                     }
                     s += _fieldInfos[i].Name;
@@ -278,17 +232,16 @@ namespace Mobge.Sheets {
             }
         }
         [Serializable]
-        public class SpriteMapping : PairMapping<Sprite>
-        {
+        public class SpriteMapping : PairMapping<Sprite> {
 
         }
         [Serializable]
-        public class ObjectMapping : PairMapping<UnityEngine.Object>
-        {
+        public class ObjectMapping : PairMapping<UnityEngine.Object> {
 
         }
-                [Serializable]
+        [Serializable]
         public class ItemMapping : AMapping<ItemSet.ItemPath> {
+            public ItemSet.ItemPath defaultValue;
             public ItemSet[] sets;
             public bool preferShortForm = true;
             public override bool ValidateValueT(ItemSet.ItemPath value) {
