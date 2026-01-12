@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using Mobge.Sheets;
 using UnityEditor;
 using UnityEngine;
+using UnityEngine.Networking;
 
 namespace Mobge.DoubleKing {
     public class GoogleAuthenticator {
@@ -53,6 +54,15 @@ namespace Mobge.DoubleKing {
             }
             // return false if get access token fails
             r.Headers.Add("Authorization", _accessParams.tokenType + " " + _accessParams.accessToken);
+            return true;
+        }
+        public async Task<bool> TryAddAccessToken(UnityWebRequest r) {
+            string token = await GetAccessToken();
+            if(string.IsNullOrEmpty(token)) {
+                return false;
+            }
+            // return false if get access token fails
+            r.SetRequestHeader("Authorization", _accessParams.tokenType + " " + _accessParams.accessToken);
             return true;
         }
         public async Task<string> GetAccessToken() {
