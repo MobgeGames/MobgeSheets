@@ -276,7 +276,7 @@ namespace Mobge.Sheets {
                     var field = fields[i];
                     MappingRef mr;
                     mr.name = field.Name;
-                    mr.valid = !IsPrimitive(field.type);
+                    mr.valid = !SheetData.IsPrimitive(field.type);
                     mr.index = -1;
                     mr.fieldType = field.type;
                     _mappingRefs.Add(mr);

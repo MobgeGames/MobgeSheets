@@ -120,11 +120,12 @@ namespace Mobge.Sheets
                     {
                         continue;
                     }
-                    var size = await ESheetData.DetectSize(sheetData);
+                    var size = await SheetData.DetectSize(sheetData);
                     var range = sheetData.tableStart.GetRange(size);
 
-                    await ESheetData.ReadFromSheet(null, sheetData, range);
-                    EditorExtensions.SetDirty(sheet.owner as Object);
+                    var obj = sheet.owner as Object;
+                    await SheetData.ReadFromSheet(obj, sheetData, range, "unknown");
+                    EditorExtensions.SetDirty(obj);
                 }
             }
             AssetDatabase.SaveAssets();

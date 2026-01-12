@@ -14,62 +14,6 @@ using static Mobge.Sheets.SheetData;
 
 namespace Mobge.Sheets {
     public partial class ESheetData {
-
-        private static bool IsPrimitive(Type t) {
-            return t == typeof(int) || t == typeof(string) || t == typeof(bool) || t == typeof(float) || t == typeof(long) || t == typeof(double);
-        }
-
-        private static void PopulateMappings(SheetData go, Field[] fields, AMapping[] mappings) {
-            for (int i = 0; i < fields.Length; i++) {
-                var field = fields[i];
-
-                if (!IsPrimitive(field.type)) {
-                    AMapping selectedMapping = null;
-                    int mappingCount = go.mappings.GetLength();
-
-                    for (int im = 0; im < mappingCount; im++) {
-                        var mapping = go.mappings[im];
-                        if (mapping.fieldName == field.Name) {
-                            selectedMapping = mapping.mapping;
-                            break;
-                        }
-                    }
-
-                    mappings[i] = selectedMapping;
-                }
-            }
-        }
-
-        private static object GetPrimitiveValue(string textValue, Type t) {
-            object value = null;
-            if (t == typeof(int)) {
-                int.TryParse(textValue, NumberStyles.Any, CultureInfo.InvariantCulture, out int i);
-                value = i;
-            }
-            else if (t == typeof(string)) {
-                value = textValue;
-            }
-            else if (t == typeof(bool)) {
-                bool.TryParse(textValue, out bool i);
-                value = i;
-            }
-            else if (t == typeof(float)) {
-                float.TryParse(textValue, NumberStyles.Any, CultureInfo.InvariantCulture, out float i);
-                value = i;
-            }
-            else if (t == typeof(long)) {
-                long.TryParse(textValue, NumberStyles.Any, CultureInfo.InvariantCulture, out long i);
-                value = i;
-            }
-            else if (t == typeof(double)) {
-                double.TryParse(textValue, NumberStyles.Any, CultureInfo.InvariantCulture, out double i);
-                value = i;
-            }
-            return value;
-        }
-
-
-
         private static async Task UpdateDropdownsCommon(SheetData go, int rowCount, CellContext ctx) {
             if (go.mappings.IsNullOrEmpty()) {
                 return;
@@ -118,48 +62,13 @@ namespace Mobge.Sheets {
                 await go.googleSheet.SetDropDowns(dropdowns.ToArray());
             }
         }
-
-
         public static async Task UpdateFromSheet(SerializedProperty p) {
-            var go = p.ReadObject<SheetData>(out var t);
-            int2 size = await DetectSize(go);
-            var range = go.tableStart.GetRange(size);
-            await ReadFromSheet(p, go, range);
-        }
-        private static CellContext FindMapping(SheetData go, JSONNode header) {
-            CellContext ctx = default;
-            ctx.sheetData = go;
-            ctx.report = new StringBuilder();
-            SheetData.TryGetFields(go.RowType, out ctx.fields);
-            ctx.fieldCount = ctx.fields.GetLength();
-            ctx.columnIndexes = new int[ctx.fieldCount];
-            ctx.mappings = new SheetData.AMapping[ctx.fieldCount];
-
-            ctx.emptyValueCount = 0;
-            ctx.emptyFields = new List<string>();
-
-            PopulateMappings(go, ctx.fields, ctx.mappings);
-
-            for (int i = 0; i < ctx.fieldCount; i++) {
-                var field = ctx.fields[i];
-                int selectedIndex = -1;
-                for (int ih = 0; ih < header.Count; ih++) {
-                    var columnCell = header[ih];
-                    if (columnCell.Value.Equals(field.Name, StringComparison.InvariantCultureIgnoreCase)) {
-                        selectedIndex = ih;
-                        break;
-                    }
-                }
-                ctx.columnIndexes[i] = selectedIndex;
-                if (selectedIndex < 0) {
-                    ctx.report.AppendLine("No column found for field: " + field.Name);
-                }
-
-                if (!IsPrimitive(field.type) && ctx.mappings[i] == null) {
-                    ctx.report.AppendLine("No mapping found for column: " + field.Name);
-                }
-            }
-            return ctx;
+            Undo.RecordObject(p.serializedObject.targetObject, "Update data from sheet");
+            var sheetData = p.ReadObject<SheetData>(out var t);
+            await SheetData.UpdateFromSheet(p.serializedObject.targetObject, sheetData, p.propertyPath);
+            p.WriteObject(sheetData);
+            p.serializedObject.ApplyModifiedProperties();
+            EditorExtensions.SetDirty(p.serializedObject.targetObject);
         }
         private static void CreateReportHeader(SerializedProperty p, string label, CellContext ctx, int rowCount) {
             ctx.report.Append(label);
@@ -178,142 +87,6 @@ namespace Mobge.Sheets {
 
             ctx.report.AppendLine(" Data count: " + rowCount);
         }
-        public static async Task ReadFromSheet(SerializedProperty p, SheetData go, string range)
-        {
-            var result = await go.googleSheet.GetValues(Dimension.ROWS, range);
-            var nodes = result[0];
-            int rowCount = nodes.Count - 1;
-            var header = nodes[0];
-            CellContext ctx = FindMapping(go, header);
-            CreateReportHeader(p, "Updating Sheet", ctx, rowCount);
-
-            object[] data = new object[rowCount];
-            for (int i = 0; i < rowCount; i++)
-            {
-                var rowCells = nodes[i + 1].AsArray;
-                object rowData = Activator.CreateInstance(go.RowType);
-                for (int iField = 0; iField < ctx.fieldCount; iField++)
-                {
-                    ctx.columnIndex = ctx.columnIndexes[iField];
-                    if (ctx.columnIndex < 0)
-                    {
-                        continue;
-                    }
-                    ctx.rowIndex = i;
-                    var field = ctx.fields[iField];
-                    var textValue = rowCells[ctx.columnIndex].Value;
-                    object value;
-                    if (field.isArray)
-                    {
-                        var values = textValue.Split(',');
-                        var arr = Array.CreateInstance(field.type, values.Length);
-                        for (int v = 0; v < values.Length; v++)
-                        {
-                            string arrValue = values[v];
-                            var o = ConvertToObject(arrValue, field, ctx.mappings[iField], ctx);
-                            arr.SetValue(o, v);
-                        }
-                        value = arr;
-                    }
-                    else
-                    {
-                        value = ConvertToObject(textValue, field, ctx.mappings[iField], ctx);
-                    }
-                    field.SetValue(rowData, value);
-
-                }
-                data[i] = rowData;
-            }
-
-            if (p != null)
-            {
-                Undo.RecordObject(p.serializedObject.targetObject, "Update data from sheet");
-            }
-
-            go.UpdateData(data);
-
-            if (p != null)
-            {
-                p.WriteObject(go);
-
-                p.serializedObject.ApplyModifiedProperties();
-                EditorExtensions.SetDirty(p.serializedObject.targetObject);
-                Debug.Log(ctx.report, p.serializedObject.targetObject);
-            }
-
-        }
-        private static object ConvertToObject(string textValue, SheetData.Field field, SheetData.AMapping mapping, in CellContext ctx) {
-            textValue = textValue.Trim(SheetData.s_trimChars);
-            object value = null;
-            if (IsPrimitive(field.type)) {
-                value = GetPrimitiveValue(textValue, field.type);
-            }
-            else {
-                if (mapping != null) {
-                    value = mapping.GetObjectRaw(textValue);
-                    //Debug.Log($"value validated: {mapping}, {value} : {mapping.ValidateValue(value)}");
-                    if (!mapping.ValidateValue(value)) {
-                        var ts = ctx.sheetData.tableStart;
-                        ts.column = CellId.Add(ts.column, ctx.columnIndex);
-                        ts.row += ctx.rowIndex + 1;
-                        ctx.report.AppendLine($"Mapping error at cell: {ts.column}:{ts.row}");
-                    }
-                }
-            }
-            return value;
-        }
-        public static async Task<int2> DetectSize(SheetData go) {
-            return (await DetectSizeAndHeader(go)).Item1;
-        }
-
-        public static async Task<(int2, JSONArray)> DetectSizeAndHeader(SheetData go) {
-            var start = go.tableStart;
-            if (string.IsNullOrEmpty(start.column)) {
-                start.column = "A";
-            }
-            if (start.row <= 0) {
-                start.row = 1;
-            }
-            string rangeH = start.column + start.row + ':' + start.row;
-            string rangeV = start.column + start.row + ':' + start.column;
-            var nodes = await go.googleSheet.GetValues(Dimension.ROWS, rangeH, rangeV);
-            
-            if (nodes.IsNullOrEmpty()) {
-                return default;
-            }
-            var nodeH = nodes[0];
-            var nodeV = nodes[1];
-            int2 size = new int2(1, 1);
-            JSONArray header = null;
-            if (nodeH.Count > 0)
-            {
-                var valsH = nodeH[0].AsArray;
-                header = new JSONArray();
-                if(valsH.Count > 0) {
-                    header.Add(valsH[0]);
-                    for (int i = 1; i < valsH.Count; i++)
-                    {
-                        if (string.IsNullOrEmpty(valsH[i].Value))
-                        {
-                            break;
-                        }
-                        size.x++;
-                        header.Add(valsH[i]);
-
-                    }
-                }
-            }
-            for (int i = 1; i < nodeV.Count; i++) {
-                if (nodeV[i].AsArray.Count == 0) {
-                    break;
-                }
-                size.y++;
-            }
-
-
-            return (size, header);
-        }
-
         private void UpdateSheetField(Meta meta, SerializedProperty p) {
             meta.updateFieldOpen = EditorGUI.Foldout(s_layout.NextRect(), meta.updateFieldOpen, "Update Sheet", true);
             if (meta.updateFieldOpen) {
@@ -370,25 +143,10 @@ namespace Mobge.Sheets {
             await UpdateDropdownsCommon(go, size.y - 1, ctx);
 
         }
-
-        private struct CellContext {
-            public StringBuilder report;
-            public int columnIndex;
-            public int rowIndex;
-            public SheetData sheetData;
-            internal int fieldCount;
-            internal int[] columnIndexes;
-            public Field[] fields;
-            internal AMapping[] mappings;
-            public int emptyValueCount;
-            public List<string> emptyFields;
-        }
-
         public static async Task WriteToSheet(SerializedProperty p) {
             var go = p.ReadObject<SheetData>(out var t);
             await WriteToSheet(p, go);
         }
-
         public static async Task WriteToSheet(SerializedProperty p, SheetData go)
         {
             if (!SheetData.TryGetFields(go.RowType, out var fields))
@@ -490,7 +248,6 @@ namespace Mobge.Sheets {
 
             Debug.Log(ctx.report, p?.serializedObject.targetObject);
         }
-        
         private static SerializedProperty FindFieldProperty(SerializedProperty rowProperty, Field field)
         {
             SerializedProperty current = rowProperty;
@@ -507,7 +264,6 @@ namespace Mobge.Sheets {
 
             return current;
         }
-
         private static string ConvertToString(SerializedProperty property, Field field, AMapping mapping, CellContext ctx) {
             if (property == null) {
                 return "";
@@ -527,7 +283,6 @@ namespace Mobge.Sheets {
                 return ConvertSingleValueToString(property, field.type, mapping, ctx);
             }
         }
-
         private static string ConvertSingleValueToString(SerializedProperty property, Type fieldType, AMapping mapping, CellContext ctx) {
             if (property == null) {
                 return "";
@@ -552,7 +307,6 @@ namespace Mobge.Sheets {
                 return "";
             }
         }
-
         private static string GetPrimitiveString(SerializedProperty property, Type fieldType) {
             if (fieldType == typeof(int)) {
                 return property.intValue.ToString(CultureInfo.InvariantCulture);
@@ -574,7 +328,6 @@ namespace Mobge.Sheets {
             }
             return "";
         }
-
         private static object GetObjectFromProperty(SerializedProperty property, Type fieldType) {
             if (property.propertyType == SerializedPropertyType.ObjectReference) {
                 return property.objectReferenceValue;
@@ -593,6 +346,5 @@ namespace Mobge.Sheets {
                 return null;
             }
         }
-
     }
 }

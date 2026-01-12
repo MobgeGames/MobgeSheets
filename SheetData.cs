@@ -1,14 +1,19 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Reflection;
+using System.Text;
+using System.Threading.Tasks;
 using Mobge.Serialization;
 using SerializeReferenceEditor;
+using SimpleJSON;
 using Sirenix.OdinInspector;
 using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.Networking;
+using Object = UnityEngine.Object;
 
 namespace Mobge.Sheets {
 	//[CreateAssetMenu(menuName = "Mobge/Sheets/Data")]
@@ -35,8 +40,247 @@ namespace Mobge.Sheets {
         public MappingEntry[] mappings;
         public abstract Type RowType { get; }
         public abstract void UpdateData(object[] rows);
+        
+        public static async Task UpdateFromSheet(Object obj, SheetData sheetData, string sheetDataName) {
+            int2 size = await DetectSize(sheetData);
+            var range = sheetData.tableStart.GetRange(size);
+            await ReadFromSheet(obj, sheetData, range, sheetDataName);
+        }
+        public static async Task<int2> DetectSize(SheetData go) {
+            return (await DetectSizeAndHeader(go)).Item1;
+        }
+        public static async Task<(int2, JSONArray)> DetectSizeAndHeader(SheetData sheetData) {
+            var start = sheetData.tableStart;
+            if (string.IsNullOrEmpty(start.column)) {
+                start.column = "A";
+            }
+            if (start.row <= 0) {
+                start.row = 1;
+            }
+            string rangeH = start.column + start.row + ':' + start.row;
+            string rangeV = start.column + start.row + ':' + start.column;
+            var nodes = await sheetData.googleSheet.GetValues(Dimension.ROWS, rangeH, rangeV);
+            
+            if (nodes.IsNullOrEmpty()) {
+                return default;
+            }
+            var nodeH = nodes[0];
+            var nodeV = nodes[1];
+            int2 size = new int2(1, 1);
+            JSONArray header = null;
+            if (nodeH.Count > 0)
+            {
+                var valsH = nodeH[0].AsArray;
+                header = new JSONArray();
+                if(valsH.Count > 0) {
+                    header.Add(valsH[0]);
+                    for (int i = 1; i < valsH.Count; i++)
+                    {
+                        if (string.IsNullOrEmpty(valsH[i].Value))
+                        {
+                            break;
+                        }
+                        size.x++;
+                        header.Add(valsH[i]);
+
+                    }
+                }
+            }
+            for (int i = 1; i < nodeV.Count; i++) {
+                if (nodeV[i].AsArray.Count == 0) {
+                    break;
+                }
+                size.y++;
+            }
 
 
+            return (size, header);
+        }
+        public static async Task ReadFromSheet(Object obj, SheetData sheetData, string range, string sheetDataName)
+        {
+            var result = await sheetData.googleSheet.GetValues(Dimension.ROWS, range);
+            var nodes = result[0];
+            int rowCount = nodes.Count - 1;
+            var header = nodes[0];
+            CellContext ctx = FindMapping(sheetData, header);
+            CreateReportHeader(obj, sheetDataName, "Updating Sheet", ctx, rowCount);
+
+            object[] data = new object[rowCount];
+            for (int i = 0; i < rowCount; i++)
+            {
+                var rowCells = nodes[i + 1].AsArray;
+                object rowData = Activator.CreateInstance(sheetData.RowType);
+                for (int iField = 0; iField < ctx.fieldCount; iField++)
+                {
+                    ctx.columnIndex = ctx.columnIndexes[iField];
+                    if (ctx.columnIndex < 0)
+                    {
+                        continue;
+                    }
+                    ctx.rowIndex = i;
+                    var field = ctx.fields[iField];
+                    var textValue = rowCells[ctx.columnIndex].Value;
+                    object value;
+                    if (field.isArray)
+                    {
+                        var values = textValue.Split(',');
+                        var arr = Array.CreateInstance(field.type, values.Length);
+                        for (int v = 0; v < values.Length; v++)
+                        {
+                            string arrValue = values[v];
+                            var o = ConvertToObject(arrValue, field, ctx.mappings[iField], ctx);
+                            arr.SetValue(o, v);
+                        }
+                        value = arr;
+                    }
+                    else
+                    {
+                        value = ConvertToObject(textValue, field, ctx.mappings[iField], ctx);
+                    }
+                    field.SetValue(rowData, value);
+
+                }
+                data[i] = rowData;
+            }
+
+            sheetData.UpdateData(data);
+            Debug.Log(ctx.report, obj);
+        }
+        
+        private static void CreateReportHeader(Object obj, string sheetDataName, string label, CellContext ctx, int rowCount) {
+            ctx.report.Append(label);
+            ctx.report.Append(": (");
+            ctx.report.Append(obj.name);
+            ctx.report.Append(", ");
+            ctx.report.Append(sheetDataName);
+            ctx.report.Append(")");
+
+            ctx.report.AppendLine(" Data count: " + rowCount);
+        }
+
+        
+        private static object ConvertToObject(string textValue, SheetData.Field field, SheetData.AMapping mapping, in CellContext ctx) {
+            textValue = textValue.Trim(SheetData.s_trimChars);
+            object value = null;
+            if (IsPrimitive(field.type)) {
+                value = GetPrimitiveValue(textValue, field.type);
+            }
+            else {
+                if (mapping != null) {
+                    value = mapping.GetObjectRaw(textValue);
+                    //Debug.Log($"value validated: {mapping}, {value} : {mapping.ValidateValue(value)}");
+                    if (!mapping.ValidateValue(value)) {
+                        var ts = ctx.sheetData.tableStart;
+                        ts.column = CellId.Add(ts.column, ctx.columnIndex);
+                        ts.row += ctx.rowIndex + 1;
+                        ctx.report.AppendLine($"Mapping error at cell: {ts.column}:{ts.row}");
+                    }
+                }
+            }
+            return value;
+        }
+        
+        private static object GetPrimitiveValue(string textValue, Type t) {
+            object value = null;
+            if (t == typeof(int)) {
+                int.TryParse(textValue, NumberStyles.Any, CultureInfo.InvariantCulture, out int i);
+                value = i;
+            }
+            else if (t == typeof(string)) {
+                value = textValue;
+            }
+            else if (t == typeof(bool)) {
+                bool.TryParse(textValue, out bool i);
+                value = i;
+            }
+            else if (t == typeof(float)) {
+                float.TryParse(textValue, NumberStyles.Any, CultureInfo.InvariantCulture, out float i);
+                value = i;
+            }
+            else if (t == typeof(long)) {
+                long.TryParse(textValue, NumberStyles.Any, CultureInfo.InvariantCulture, out long i);
+                value = i;
+            }
+            else if (t == typeof(double)) {
+                double.TryParse(textValue, NumberStyles.Any, CultureInfo.InvariantCulture, out double i);
+                value = i;
+            }
+            return value;
+        }
+        
+        public static CellContext FindMapping(SheetData sheetData, JSONNode header) {
+            CellContext ctx = default;
+            ctx.sheetData = sheetData;
+            ctx.report = new StringBuilder();
+            SheetData.TryGetFields(sheetData.RowType, out ctx.fields);
+            ctx.fieldCount = ctx.fields.GetLength();
+            ctx.columnIndexes = new int[ctx.fieldCount];
+            ctx.mappings = new SheetData.AMapping[ctx.fieldCount];
+
+            ctx.emptyValueCount = 0;
+            ctx.emptyFields = new List<string>();
+
+            PopulateMappings(sheetData, ctx.fields, ctx.mappings);
+
+            for (int i = 0; i < ctx.fieldCount; i++) {
+                var field = ctx.fields[i];
+                int selectedIndex = -1;
+                for (int ih = 0; ih < header.Count; ih++) {
+                    var columnCell = header[ih];
+                    if (columnCell.Value.Equals(field.Name, StringComparison.InvariantCultureIgnoreCase)) {
+                        selectedIndex = ih;
+                        break;
+                    }
+                }
+                ctx.columnIndexes[i] = selectedIndex;
+                if (selectedIndex < 0) {
+                    ctx.report.AppendLine("No column found for field: " + field.Name);
+                }
+
+                if (!IsPrimitive(field.type) && ctx.mappings[i] == null) {
+                    ctx.report.AppendLine("No mapping found for column: " + field.Name);
+                }
+            }
+            return ctx;
+        }
+
+        public static bool IsPrimitive(Type t) {
+            return t == typeof(int) || t == typeof(string) || t == typeof(bool) || t == typeof(float) || t == typeof(long) || t == typeof(double);
+        }
+
+        private static void PopulateMappings(SheetData sheetData, Field[] fields, AMapping[] mappings) {
+            for (int i = 0; i < fields.Length; i++) {
+                var field = fields[i];
+
+                if (!IsPrimitive(field.type)) {
+                    AMapping selectedMapping = null;
+                    int mappingCount = sheetData.mappings.GetLength();
+
+                    for (int im = 0; im < mappingCount; im++) {
+                        var mapping = sheetData.mappings[im];
+                        if (mapping.fieldName == field.Name) {
+                            selectedMapping = mapping.mapping;
+                            break;
+                        }
+                    }
+
+                    mappings[i] = selectedMapping;
+                }
+            }
+        }
+
+        public struct CellContext {
+            public StringBuilder report;
+            public int columnIndex;
+            public int rowIndex;
+            public SheetData sheetData;
+            public int fieldCount;
+            public int[] columnIndexes;
+            public Field[] fields;
+            public AMapping[] mappings;
+            public int emptyValueCount;
+            public List<string> emptyFields;
+        }
 
         [Serializable]
         public struct MappingEntry {
