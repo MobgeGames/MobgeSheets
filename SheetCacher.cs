@@ -12,14 +12,20 @@ using UnityEngine.Networking;
 namespace Mobge.Sheets  {
 	public class SheetCacher {
 		private static string RootFolderPath => Path.Combine(Application.persistentDataPath, "Sheets");
-		public virtual bool TryGetValues(GoogleSheet sheet, Dimension dimension, string[] ranges, out JSONArray[] result) {
-			Debug.Log($"Trying to get sheet data from cache {sheet.sheetId}");
+
+		public virtual bool TryGetValues(GoogleSheet sheet, Dimension dimension, string[] ranges,
+			out JSONArray[] result) {
+			return TryGetValues(sheet.sheetId, sheet.sheetName, dimension, ranges, out result);
+		}
+
+		public bool TryGetValues(string spreadSheetId, string sheetName, Dimension dimension, string[] ranges, out JSONArray[] result) {
+			Debug.Log($"Trying to get sheet data from cache {spreadSheetId}");
 			foreach (var range in ranges) {
 				Debug.Log("Range " + range);
 			}
-			var filePath = Path.Combine(RootFolderPath, sheet.sheetId, sheet.sheetName + ".csv");
+			var filePath = Path.Combine(RootFolderPath, spreadSheetId, sheetName + ".csv");
 			if (!File.Exists(filePath)) {
-				Debug.Log($"Sheet not found on cache {sheet.sheetId}");
+				Debug.Log($"Sheet not found on cache {spreadSheetId}");
 				result = null;
 				return false;
 			}
@@ -76,7 +82,7 @@ namespace Mobge.Sheets  {
 				}
 			}
 			
-			Debug.Log($"Sheet found on cache returning result {sheet.sheetId}");
+			Debug.Log($"Sheet found on cache returning result {spreadSheetId}");
 			return true;
 		}
 		protected List<List<string>> ParseCsv(string text) {
@@ -192,14 +198,14 @@ namespace Mobge.Sheets  {
 			
 			return false;
 		}
-		public virtual async Task CacheSheet(string baseId, string overrideId) {
-			Debug.Log($"Caching sheet {overrideId}");
-			var folderPath = Path.Combine(RootFolderPath, overrideId);
+		public virtual async Task CacheSheet(string sheetId) {
+			Debug.Log($"Caching sheet {sheetId}");
+			var folderPath = Path.Combine(RootFolderPath, sheetId);
 			if (Directory.Exists(folderPath)) {
-				Debug.Log($"Sheet already cached, skipping {overrideId}");
+				Debug.Log($"Sheet already cached, skipping {sheetId}");
 				return;
 			}
-			await DownloadSpreadSheet(overrideId);
+			await DownloadSpreadSheet(sheetId);
 		}
 		protected static async Task DownloadSpreadSheet(string spreadSheetID) {
 			Debug.Log($"Starting spread sheet with id {spreadSheetID} downloading...");
