@@ -238,14 +238,13 @@ protected bool TryGetRange(string range, Vector2Int size, out Vector2Int start, 
 		protected static async Task<List<string>> GetSheetNames(string spreadSheetID)
 		{
 			string url = $"https://sheets.googleapis.com/v4/spreadsheets/{spreadSheetID}";
-			UnityWebRequest req = UnityWebRequest.Get(url);
-			bool success = await GoogleAuthenticator.Instance.TryAddAccessToken(req);
+			var req = UnityWebRequest.Get(url);
+			bool success = await GoogleAuthenticator.Instance.TryAddAccessToken(req, true);
 			if (!success) {
 				Debug.LogError("Google authentication failed!");
 				return null;
 			}
 			await req.SendWebRequest();
-
 			if (req.result != UnityWebRequest.Result.Success) {
 				Debug.LogError(req.error);
 				return null;
@@ -280,7 +279,7 @@ protected bool TryGetRange(string range, Vector2Int size, out Vector2Int start, 
 
 			Debug.Log($"Requesting batch download...");
 			var req = UnityWebRequest.Get(url);
-			bool success = await GoogleAuthenticator.Instance.TryAddAccessToken(req);
+			bool success = await GoogleAuthenticator.Instance.TryAddAccessToken(req, true);
 			if (!success) return;
 
 			await req.SendWebRequest();

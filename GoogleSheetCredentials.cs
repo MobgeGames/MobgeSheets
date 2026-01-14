@@ -29,7 +29,6 @@ namespace Mobge.Sheets {
         public string clientId;
         public string clientSecret;
         [SerializeField] private string apiKey;
-        
-
+        public string APIKey => apiKey;
     }
 }

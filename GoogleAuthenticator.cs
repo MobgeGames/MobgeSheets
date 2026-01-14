@@ -47,22 +47,17 @@ namespace Mobge.DoubleKing {
             // Debug.Log("access params save " + jPrms);
             PlayerPrefs.SetString(SaveKey, jPrms);
         } 
-        public async Task<bool> TryAddAccessToken(WebRequest r) {
+        public async Task<bool> TryAddAccessToken(UnityWebRequest req, bool forceUseApiKey = false) {
             string token = await GetAccessToken();
             if(string.IsNullOrEmpty(token)) {
                 return false;
             }
             // return false if get access token fails
-            r.Headers.Add("Authorization", _accessParams.tokenType + " " + _accessParams.accessToken);
-            return true;
-        }
-        public async Task<bool> TryAddAccessToken(UnityWebRequest r) {
-            string token = await GetAccessToken();
-            if(string.IsNullOrEmpty(token)) {
-                return false;
+            if (Application.isEditor && !forceUseApiKey) {
+                req.SetRequestHeader("Authorization", _accessParams.tokenType + " " + _accessParams.accessToken);
+            } else {
+                req.SetRequestHeader("key", _credentials.APIKey);
             }
-            // return false if get access token fails
-            r.SetRequestHeader("Authorization", _accessParams.tokenType + " " + _accessParams.accessToken);
             return true;
         }
         public async Task<string> GetAccessToken() {
