@@ -44,48 +44,68 @@ namespace Mobge.Sheets  {
 			result = new JSONArray[ranges.Length];
 			for(int i = 0; i < ranges.Length; i++) {
 				if(TryGetRange(ranges[i], size, out var start, out var end)) {
-					var rowArray = new JSONArray();
-					// Ensure range is within grid bounds
-					int startRow = Mathf.Clamp(start.y, 0, grid.Count - 1);
-					int endRow = Mathf.Clamp(end.y, 0, grid.Count - 1);
+					var rangeResult = new JSONArray();
 					
-					for (int r = startRow; r <= endRow; r++) {
-						var row = grid[r];
-						var colArray = new JSONArray();
-						
-						int startCol = Mathf.Clamp(start.x, 0, row.Count - 1);
-						// Note: different rows might have different lengths in CSV
-						// but end.x is the requested range end. 
-						// We should probably respect the requested range but pad with empty or stop at row end?
-						// Google Sheets API returns available values. If row is short, it stops.
-						int endCol = Mathf.Clamp(end.x, 0, row.Count - 1);
-
-						// However, if the requested range goes BEYOND the row length, we just stop.
-						// If the requested range starts after row length, we add empty row?
-						// Let's stick to: iterate requested range, if valid in grid, add it.
-						
-						// Re-calculating loop bounds based on request vs actual
-						// Actually, we should iterate the REQUESTED range, and fill with empty if missing?
-						// Google API behavior: "Empty trailing rows and columns are omitted."
-						// But existing code expects "values" array.
-						
-						int loopEndCol = Mathf.Min(end.x, row.Count - 1);
-						
-						if (start.x < row.Count) {
-							for (int c = start.x; c <= loopEndCol; c++) {
-								colArray.Add(row[c]);
+					if (dimension == Dimension.ROWS) {
+						// Grid: Rows [ Cols ]
+						for (int r = start.y; r <= end.y; r++) {
+							if (r < 0 || r >= grid.Count) continue;
+							
+							var rowData = grid[r];
+							var rowJson = new JSONArray();
+							
+							// Find last non-empty column index for this row within requested range
+							int lastValidCol = -1;
+							for (int c = Math.Max(0, start.x); c <= Math.Min(end.x, rowData.Count - 1); c++) {
+								if (!string.IsNullOrEmpty(rowData[c])) lastValidCol = c;
+							}
+							
+							// Add values up to last non-empty column
+							for (int c = start.x; c <= lastValidCol; c++) {
+								if (c < 0 || c >= rowData.Count) rowJson.Add("");
+								else rowJson.Add(rowData[c]);
+							}
+							
+							if (rowJson.Count > 0) {
+								rangeResult.Add(rowJson);
 							}
 						}
-						
-						if (colArray.Count > 0) {
-							rowArray.Add(colArray);
+					}
+					else {
+						// Dimension.COLUMNS
+						// Grid: Cols [ Rows ]
+						for (int c = start.x; c <= end.x; c++) {
+							var colJson = new JSONArray();
+							
+							// Find last non-empty row index for this column within requested range
+							int lastValidRow = -1;
+							for (int r = Math.Max(0, start.y); r <= Math.Min(end.y, grid.Count - 1); r++) {
+								var rowData = grid[r];
+								if (c >= 0 && c < rowData.Count && !string.IsNullOrEmpty(rowData[c])) {
+									lastValidRow = r;
+								}
+							}
+							
+							// Add values up to last non-empty row
+							for (int r = start.y; r <= lastValidRow; r++) {
+								if (r < 0 || r >= grid.Count) {
+									colJson.Add("");
+									continue;
+								}
+								var rowData = grid[r];
+								if (c < 0 || c >= rowData.Count) colJson.Add("");
+								else colJson.Add(rowData[c]);
+							}
+							
+							if (colJson.Count > 0) {
+								rangeResult.Add(colJson);
+							}
 						}
 					}
-					result[i] = rowArray;
+					
+					result[i] = rangeResult;
 				}
 				else {
-					// Fallback or error for invalid range format? 
-					// existing code didn't handle errors much.
 					result[i] = new JSONArray();
 				}
 			}
