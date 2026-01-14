@@ -12,6 +12,14 @@ using UnityEngine.Networking;
 namespace Mobge.Sheets  {
 	//TODO made instance
 	public class SheetCacher {
+
+		public static SheetCacher _instance;
+		public static SheetCacher Instance => _instance ??= new SheetCacher();
+
+		public static void InjectInstance(SheetCacher sheetCacher) {
+			_instance = sheetCacher;
+		}
+		
 		private static string RootFolderPath => Path.Combine(Application.persistentDataPath, "Sheets");
 
 		public virtual bool TryGetValues(GoogleSheet sheet, Dimension dimension, string[] ranges,
