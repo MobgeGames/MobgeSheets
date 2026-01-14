@@ -10,6 +10,7 @@ using UnityEngine;
 using UnityEngine.Networking;
 
 namespace Mobge.Sheets  {
+	//TODO made instance
 	public class SheetCacher {
 		private static string RootFolderPath => Path.Combine(Application.persistentDataPath, "Sheets");
 
@@ -33,9 +34,16 @@ namespace Mobge.Sheets  {
 			var raw = File.ReadAllText(filePath);
 			var grid = ParseCsv(raw);
 			
+			int rowCount = grid.Count;
+			int colCount = 0;
+			for (int i = 0; i < grid.Count; i++) {
+				if (grid[i].Count > colCount) colCount = grid[i].Count;
+			}
+			Vector2Int size = new Vector2Int(colCount, rowCount);
+			
 			result = new JSONArray[ranges.Length];
 			for(int i = 0; i < ranges.Length; i++) {
-				if(TryGetRange(ranges[i], out var start, out var end)) {
+				if(TryGetRange(ranges[i], size, out var start, out var end)) {
 					var rowArray = new JSONArray();
 					// Ensure range is within grid bounds
 					int startRow = Mathf.Clamp(start.y, 0, grid.Count - 1);
@@ -153,51 +161,63 @@ namespace Mobge.Sheets  {
 			}
 			return result;
 		}
-		protected bool TryGetRange(string range, out Vector2Int start, out Vector2Int end) {
-			start = Vector2Int.zero;
-			end = Vector2Int.zero;
-			
-			// Format: "SheetName!A1:B5" or "A1:B5" (assuming sheet matches file)
-			// The passed range might contain sheet name, split by !
-			var parts = range.Split('!');
-			var rangePart = parts[parts.Length - 1];
-			
-			var subParts = rangePart.Split(':');
-			if (subParts.Length != 2) return false;
-			
-			if (!TryParseCell(subParts[0], out start)) return false;
-			if (!TryParseCell(subParts[1], out end)) return false;
-			
-			return true;
-		}
-		protected bool TryParseCell(string cell, out Vector2Int coord) {
-			coord = Vector2Int.zero;
-			string letters = "";
-			string numbers = "";
-			
-			foreach (char c in cell) {
-				if (char.IsLetter(c)) letters += c;
-				else if (char.IsDigit(c)) numbers += c;
-			}
-			
-			if (string.IsNullOrEmpty(letters) || string.IsNullOrEmpty(numbers)) return false;
-			
-			// Column
-			int col = 0;
-			foreach (char c in letters) {
-				col *= 26;
-				col += (char.ToUpper(c) - 'A' + 1);
-			}
-			coord.x = col - 1; // 0-based
-			
-			// Row
-			if (int.TryParse(numbers, out int row)) {
-				coord.y = row - 1; // 0-based
-				return true;
-			}
-			
-			return false;
-		}
+protected bool TryGetRange(string range, Vector2Int size, out Vector2Int start, out Vector2Int end) {
+            start = Vector2Int.zero;
+            end = Vector2Int.zero;
+            
+            // Format: "SheetName!A1:B5" or "A1:B5" (assuming sheet matches file)
+            // The passed range might contain sheet name, split by !
+            var parts = range.Split('!');
+            var rangePart = parts[parts.Length - 1];
+            
+            var subParts = rangePart.Split(':');
+            if (subParts.Length != 2) return false;
+            
+            if (!TryParseCell(subParts[0], size, true, out start)) return false;
+            if (!TryParseCell(subParts[1], size, false, out end)) return false;
+            
+            return true;
+        }
+        protected bool TryParseCell(string cell, Vector2Int size, bool isMin, out Vector2Int coord) {
+            coord = Vector2Int.zero;
+            string letters = "";
+            string numbers = "";
+            
+            foreach (char c in cell) {
+                if (char.IsLetter(c)) letters += c;
+                else if (char.IsDigit(c)) numbers += c;
+            }
+            
+            if (string.IsNullOrEmpty(letters) && string.IsNullOrEmpty(numbers)) return false;
+
+            if(string.IsNullOrEmpty(letters)) {
+                if(isMin) {
+                    coord.x = 0;
+                }
+                else {
+                    coord.x = size.x - 1;
+                }
+            } else {
+                coord.x = CellId.ColumnToIndex(letters) - 1;
+            }
+
+            if(string.IsNullOrEmpty(numbers)) {
+                if(isMin) {
+                    coord.y = 0;
+                }
+                else {
+                    coord.y = size.y - 1;
+                }
+            }
+            else {
+                if (int.TryParse(numbers, out int row)) {
+                    coord.y = row - 1; // 0-based
+                }
+            }
+            
+            
+            return true;
+        }
 		public virtual async Task CacheSheet(string sheetId) {
 			Debug.Log($"Caching sheet {sheetId}");
 			var folderPath = Path.Combine(RootFolderPath, sheetId);
