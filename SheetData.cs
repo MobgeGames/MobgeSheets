@@ -40,7 +40,24 @@ namespace Mobge.Sheets {
         public MappingEntry[] mappings;
         public abstract Type RowType { get; }
         public abstract void UpdateData(object[] rows);
-        
+
+        public async Task TestSheetCacher() {
+            var start = tableStart;
+            if (string.IsNullOrEmpty(start.column)) {
+                start.column = "A";
+            }
+            if (start.row <= 0) {
+                start.row = 1;
+            }
+            string rangeH = start.column + start.row + ':' + start.row;
+            string rangeV = start.column + start.row + ':' + start.column;
+            var ranges = new[] { rangeH, rangeV };
+            await SheetCacher.Instance.TestCacher(googleSheet, Dimension.ROWS, ranges);
+            int2 size = await DetectSize(this);
+            var range = tableStart.GetRange(size);
+            await SheetCacher.Instance.TestCacher(googleSheet, Dimension.ROWS, new []{range});
+        }
+
         public static async Task UpdateFromSheet(Object obj, SheetData sheetData, string sheetDataName) {
             int2 size = await DetectSize(sheetData);
             var range = sheetData.tableStart.GetRange(size);
@@ -61,6 +78,7 @@ namespace Mobge.Sheets {
             string rangeV = start.column + start.row + ':' + start.column;
 
             JSONArray[] nodes;
+            // if (Application.isEditor && false) {
             if (Application.isEditor) {
                 nodes = await sheetData.googleSheet.GetValues(Dimension.ROWS, rangeH, rangeV);
             } else {
@@ -102,13 +120,29 @@ namespace Mobge.Sheets {
 
             return (size, header);
         }
+
+        public static string ResultToText(JSONArray[] nodes)
+        {
+            StringBuilder sb = new StringBuilder();
+            sb.AppendLine($"Nodes: {nodes.Length}");
+            sb.AppendLine($"{nodes.Length}:{nodes[0].Count}");
+            foreach (var node in nodes) {
+                sb.AppendLine($"{node}");
+            }
+
+            return sb.ToString();
+        }
+
         public static async Task ReadFromSheet(Object obj, SheetData sheetData, string range, string sheetDataName)
         {
             JSONArray[] result;
+            // if (Application.isEditor && false) {
             if (Application.isEditor) {
                 result = await sheetData.googleSheet.GetValues(Dimension.ROWS, range);
             } else {
-                SheetCacher.Instance.TryGetValues(sheetData.googleSheet, Dimension.ROWS, new []{range}, out result);
+                if (!SheetCacher.Instance.TryGetValues(sheetData.googleSheet, Dimension.ROWS, new []{range}, out result)) {
+                    return;
+                }
             }
             var nodes = result[0];
             int rowCount = nodes.Count - 1;

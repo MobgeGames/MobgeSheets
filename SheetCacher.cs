@@ -8,6 +8,7 @@ using Mobge.DoubleKing;
 using SimpleJSON;
 using UnityEngine;
 using UnityEngine.Networking;
+using Random = UnityEngine.Random;
 
 namespace Mobge.Sheets  {
 	//TODO made instance
@@ -27,6 +28,26 @@ namespace Mobge.Sheets  {
 			return TryGetValues(sheet.sheetId, sheet.sheetName, dimension, ranges, out result);
 		}
 
+		public async Task TestCacher(GoogleSheet sheet, Dimension dimension, string[] ranges) {
+			Debug.Log($"Testing cacher on {sheet.sheetName}.");
+			var hasCache = TryGetValues(sheet.sheetId, sheet.sheetName, dimension, ranges, out var cacheResult);
+			if (!hasCache) {
+				Debug.Log($"The sheet is not cached, was not able to test on {sheet.sheetName}.");
+				return;
+			}
+			var webRequestResult = await sheet.GetValues(dimension, ranges);
+			var cacheText = SheetData.ResultToText(cacheResult);
+			var webRequestText = SheetData.ResultToText(webRequestResult);
+			var testPassed = cacheText == webRequestText;
+			if (testPassed) {
+				Debug.Log($"The test passed.");
+			} else {
+				Debug.LogError($"The test failed.");
+				Debug.Log($"Text from cache; \\n" + cacheText);
+				Debug.Log($"Text from web request; \\n" + webRequestText);
+			}
+		}
+		
 		public bool TryGetValues(string spreadSheetId, string sheetName, Dimension dimension, string[] ranges, out JSONArray[] result) {
 			Debug.Log($"Trying to get sheet data from cache {spreadSheetId}");
 			foreach (var range in ranges) {
@@ -42,10 +63,10 @@ namespace Mobge.Sheets  {
 			var raw = File.ReadAllText(filePath);
 			var grid = ParseCsv(raw);
 			
-			int rowCount = grid.Count;
+			int rowCount = grid.Length;
 			int colCount = 0;
-			for (int i = 0; i < grid.Count; i++) {
-				if (grid[i].Count > colCount) colCount = grid[i].Count;
+			for (int i = 0; i < grid.Length; i++) {
+				if (grid[i].Length > colCount) colCount = grid[i].Length;
 			}
 			Vector2Int size = new Vector2Int(colCount, rowCount);
 			
@@ -53,62 +74,51 @@ namespace Mobge.Sheets  {
 			for(int i = 0; i < ranges.Length; i++) {
 				if(TryGetRange(ranges[i], size, out var start, out var end)) {
 					var rangeResult = new JSONArray();
-					
 					if (dimension == Dimension.ROWS) {
-						// Grid: Rows [ Cols ]
-						for (int r = start.y; r <= end.y; r++) {
-							if (r < 0 || r >= grid.Count) continue;
-							
-							var rowData = grid[r];
-							var rowJson = new JSONArray();
-							
-							// Find last non-empty column index for this row within requested range
-							int lastValidCol = -1;
-							for (int c = Math.Max(0, start.x); c <= Math.Min(end.x, rowData.Count - 1); c++) {
-								if (!string.IsNullOrEmpty(rowData[c])) lastValidCol = c;
+						for (int y = start.y; y <= end.y; y++) {
+							var json = new JSONArray();
+							for (int x = start.x; x <= end.x; x++) {
+								if (grid[y].Length <= x) {
+									continue;
+								}
+								
+								json.Add(grid[y][x]);
 							}
-							
-							// Add values up to last non-empty column
-							for (int c = start.x; c <= lastValidCol; c++) {
-								if (c < 0 || c >= rowData.Count) rowJson.Add("");
-								else rowJson.Add(rowData[c]);
-							}
-							
-							if (rowJson.Count > 0) {
-								rangeResult.Add(rowJson);
-							}
+
+							rangeResult.Add(json);
 						}
 					}
 					else {
-						// Dimension.COLUMNS
-						// Grid: Cols [ Rows ]
-						for (int c = start.x; c <= end.x; c++) {
-							var colJson = new JSONArray();
-							
-							// Find last non-empty row index for this column within requested range
-							int lastValidRow = -1;
-							for (int r = Math.Max(0, start.y); r <= Math.Min(end.y, grid.Count - 1); r++) {
-								var rowData = grid[r];
-								if (c >= 0 && c < rowData.Count && !string.IsNullOrEmpty(rowData[c])) {
-									lastValidRow = r;
-								}
-							}
-							
-							// Add values up to last non-empty row
-							for (int r = start.y; r <= lastValidRow; r++) {
-								if (r < 0 || r >= grid.Count) {
-									colJson.Add("");
+						for (int x = start.x; x <= end.x; x++) {
+							var json = new JSONArray();
+							for (int y = start.y; y <= end.y; y++) {
+								if (grid[y].Length <= x) {
 									continue;
 								}
-								var rowData = grid[r];
-								if (c < 0 || c >= rowData.Count) colJson.Add("");
-								else colJson.Add(rowData[c]);
+								json.Add(grid[y][x]);
 							}
 							
-							if (colJson.Count > 0) {
-								rangeResult.Add(colJson);
+							if (json.Count > 0) {
+								rangeResult.Add(json);
 							}
 						}
+					}
+
+					for (int j = rangeResult.Count - 1; j >= 0; j--) {
+						var json = rangeResult[j];
+						bool found = false;
+						for (int k = 0; k < json.Count; k++) {
+							if (!string.IsNullOrEmpty(json[k])) {
+								found = true;
+								break;
+							}
+						}
+
+						if (found) {
+							break;
+						}
+
+						rangeResult.Remove(j);
 					}
 					
 					result[i] = rangeResult;
@@ -121,80 +131,18 @@ namespace Mobge.Sheets  {
 			Debug.Log($"Sheet found on cache returning result {spreadSheetId}");
 			return true;
 		}
-		protected List<List<string>> ParseCsv(string text) {
-			var result = new List<List<string>>();
-			int pos = 0;
-			while (pos < text.Length) {
-				var row = new List<string>();
-				while (pos < text.Length) {
-					// Parse cell
-					if (text[pos] == '"') {
-						// Quoted
-						pos++;
-						int start = pos;
-						while (true) {
-							int nextQuote = text.IndexOf('"', pos);
-							if (nextQuote == -1) {
-								// Broken CSV, take rest
-								pos = text.Length;
-								break;
-							}
-							if (nextQuote + 1 < text.Length && text[nextQuote + 1] == '"') {
-								// Escaped quote
-								pos = nextQuote + 2;
-							} else {
-								// End of cell
-								row.Add(text.Substring(start, nextQuote - start).Replace("\"\"", "\""));
-								pos = nextQuote + 1;
-								break;
-							}
-						}
-					} else {
-						// Unquoted
-						int nextComma = text.IndexOf(',', pos);
-						int nextLine = text.IndexOf('\n', pos);
-						if (nextLine != -1 && (nextLine < nextComma || nextComma == -1)) {
-							// End of line comes first
-							// Check for \r
-							int end = nextLine;
-							if (end > pos && text[end - 1] == '\r') end--;
-							
-							row.Add(text.Substring(pos, end - pos));
-							pos = nextLine + 1;
-							// End of row
-							break;
-						} else if (nextComma != -1) {
-							// Comma
-							row.Add(text.Substring(pos, nextComma - pos));
-							pos = nextComma + 1;
-						} else {
-							// End of file
-							row.Add(text.Substring(pos));
-							pos = text.Length;
-							break;
-						}
-					}
-					
-					// Consume comma if we just finished a cell and next is comma
-					if (pos < text.Length && text[pos] == ',') {
-						pos++;
-					} else if (pos < text.Length && (text[pos] == '\n' || text[pos] == '\r')) {
-						// End of row
-						if (text[pos] == '\r' && pos + 1 < text.Length && text[pos+1] == '\n') pos++;
-						pos++;
-						break;
-					}
-				}
-				result.Add(row);
+		protected string[][] ParseCsv(string text) {
+			var lines = text.Split('\n');
+			var result = new string[lines.Length][];
+			for (var index = 0; index < lines.Length; index++) {
+				result[index] = lines[index].Split(',');
 			}
 			return result;
 		}
-protected bool TryGetRange(string range, Vector2Int size, out Vector2Int start, out Vector2Int end) {
+		protected bool TryGetRange(string range, Vector2Int size, out Vector2Int start, out Vector2Int end) {
             start = Vector2Int.zero;
             end = Vector2Int.zero;
             
-            // Format: "SheetName!A1:B5" or "A1:B5" (assuming sheet matches file)
-            // The passed range might contain sheet name, split by !
             var parts = range.Split('!');
             var rangePart = parts[parts.Length - 1];
             
@@ -259,7 +207,7 @@ protected bool TryGetRange(string range, Vector2Int size, out Vector2Int start, 
 			Debug.Log($"Starting spread sheet with id {spreadSheetID} downloading...");
 			var sheetNames = await GetSheetNames(spreadSheetID);
 			if (sheetNames != null && sheetNames.Count > 0) {
-				await DownloadAllSheets(spreadSheetID, sheetNames.ToArray());
+				await DownloadAllSheets(spreadSheetID, sheetNames);
 			}
 			Debug.Log($"Spread sheet with id {spreadSheetID} downloaded...");
 		}
@@ -267,7 +215,7 @@ protected bool TryGetRange(string range, Vector2Int size, out Vector2Int start, 
 		{
 			string url = $"https://sheets.googleapis.com/v4/spreadsheets/{spreadSheetID}";
 			var req = UnityWebRequest.Get(url);
-			bool success = await GoogleAuthenticator.Instance.TryAddAccessToken(req, true);
+			bool success = await GoogleAuthenticator.Instance.TryAddAuthentication(req, true);
 			if (!success) {
 				Debug.LogError("Google authentication failed!");
 				return null;
@@ -298,7 +246,7 @@ protected bool TryGetRange(string range, Vector2Int size, out Vector2Int start, 
 			}
 			return sheetNames;
 		}
-		protected static async Task DownloadAllSheets(string spreadsheetId, string[] sheetNames) {
+		protected static async Task DownloadAllSheets(string spreadsheetId, IList<string> sheetNames) {
 			var url = $"https://sheets.googleapis.com/v4/spreadsheets/{spreadsheetId}/values:batchGet?";
 			foreach (var sheet in sheetNames)
 				url += $"ranges={UnityWebRequest.EscapeURL(sheet)}&";
@@ -307,7 +255,7 @@ protected bool TryGetRange(string range, Vector2Int size, out Vector2Int start, 
 
 			Debug.Log($"Requesting batch download...");
 			var req = UnityWebRequest.Get(url);
-			bool success = await GoogleAuthenticator.Instance.TryAddAccessToken(req, true);
+			bool success = await GoogleAuthenticator.Instance.TryAddAuthentication(req, true);
 			if (!success) return;
 
 			await req.SendWebRequest();
@@ -321,6 +269,8 @@ protected bool TryGetRange(string range, Vector2Int size, out Vector2Int start, 
 			// Debug.Log($"Batch JSON: {json}"); // Too large to log typically
 
 			var data = GA_MiniJSON.Deserialize(json) as Dictionary<string, object>;
+			var rnd = Random.Range(1000, 10000);
+			var tempFolderPath = Path.Combine(RootFolderPath, $"{spreadsheetId}_{rnd}");
 			if (data != null && data.ContainsKey("valueRanges")) {
 				var valueRanges = data["valueRanges"] as List<object>;
 				foreach (var rangeObj in valueRanges) {
@@ -348,8 +298,11 @@ protected bool TryGetRange(string range, Vector2Int size, out Vector2Int start, 
 					}
 
 					string csv = ConvertToCsv(rows);
-					await SaveCsv(spreadsheetId, range, csv);
+					await SaveCsv(tempFolderPath, range, csv);
 				}
+				
+				var newFolderPath = Path.Combine(RootFolderPath, spreadsheetId);
+				Directory.Move(tempFolderPath, newFolderPath);
 			}
 		}
 		protected static string ConvertToCsv(List<List<string>> rows)
@@ -377,14 +330,13 @@ protected bool TryGetRange(string range, Vector2Int size, out Vector2Int start, 
 
 			return sb.ToString();
 		}
-		protected static async Task SaveCsv(string spreadSheetId, string range, string csv)
+		protected static async Task SaveCsv(string folderPath, string range, string csv)
 		{
 			// "Users!A1:D20" → "Users"
 			string sheetName = range.Split('!')[0];
 			// Clean up sheet name just in case
 			sheetName = sheetName.Replace("'", ""); 
 
-			var folderPath = Path.Combine(RootFolderPath, spreadSheetId);
 			if (!Directory.Exists(folderPath)) {
 				Directory.CreateDirectory(folderPath);
 			}

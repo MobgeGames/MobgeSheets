@@ -21,7 +21,7 @@ namespace Mobge.Sheets {
             UriBuilder b = new UriBuilder($"https://sheets.googleapis.com/v4/spreadsheets/{sheetId}");
             b.AddParameter("ranges", sheetName);
             var req = UnityWebRequest.Get(b.Uri);
-            bool success = await GoogleAuthenticator.Instance.TryAddAccessToken(req);
+            bool success = await GoogleAuthenticator.Instance.TryAddAuthentication(req);
             if(!success) {
                 return default;
             }
@@ -45,7 +45,7 @@ namespace Mobge.Sheets {
                 uri.AddParameter("ranges", sheetName + "!" + ranges[i]);
             }
             var req = UnityWebRequest.Get(uri.Uri);
-            bool success = await GoogleAuthenticator.Instance.TryAddAccessToken(req);
+            bool success = await GoogleAuthenticator.Instance.TryAddAuthentication(req);
             if(!success) {
                 return default;
             }
@@ -106,7 +106,7 @@ namespace Mobge.Sheets {
             req.uploadHandler = new UploadHandlerRaw(bodyRaw);
             req.SetRequestHeader("Content-Type", "application/json;charset=UTF-8");
             
-            if(!await GoogleAuthenticator.Instance.TryAddAccessToken(req)){
+            if(!await GoogleAuthenticator.Instance.TryAddAuthentication(req)){
                 Debug.LogError("Authorization failed");
                 return;
             }
@@ -137,7 +137,7 @@ namespace Mobge.Sheets {
             req.uploadHandler = new UploadHandlerRaw(bodyRaw);
             req.SetRequestHeader("Content-Type", "application/json;charset=UTF-8");
             
-            if(!await GoogleAuthenticator.Instance.TryAddAccessToken(req)){
+            if(!await GoogleAuthenticator.Instance.TryAddAuthentication(req)){
                 Debug.LogError("Authorization failed");
                 return;
             }
