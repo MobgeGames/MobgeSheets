@@ -56,7 +56,9 @@ namespace Mobge.DoubleKing {
                 }
                 req.SetRequestHeader("Authorization", _accessParams.tokenType + " " + _accessParams.accessToken);
             } else {
-                req.SetRequestHeader("key", _credentials.APIKey);
+                var uri = new Uri(req.url);
+                string separator = string.IsNullOrEmpty(uri.Query) ? "?" : "&";
+                req.url = uri + separator + "key=" + UnityWebRequest.EscapeURL(_credentials.APIKey);
             }
             return true;
         }
