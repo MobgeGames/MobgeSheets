@@ -134,7 +134,7 @@ namespace Mobge.Sheets {
             await UpdateDropdownsCommon(_go, rowCount, ctx);
         }
         private async void TryUpdateDropdowns(SheetData go) {
-            (var size, var header) = await DetectSizeAndHeader(go);
+            var (size, header, success) = await DetectSizeAndHeader(go);
             if (size.y < 2) {
                 Debug.LogError("Table has no rows.");
                 return;
@@ -154,7 +154,7 @@ namespace Mobge.Sheets {
                 Debug.LogError("No serializable fields found in data type.");
                 return;
             }
-            (int2 size, JSONArray header) = await DetectSizeAndHeader(go);
+            var (size, header, success) = await DetectSizeAndHeader(go);
             
             var dataProperty = p.FindPropertyRelative("data");
             int totalRows = dataProperty.arraySize;

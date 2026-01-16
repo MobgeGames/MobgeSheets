@@ -120,8 +120,8 @@ namespace Mobge.Sheets
                     {
                         continue;
                     }
-                    var size = await SheetData.DetectSize(sheetData);
-                    var range = sheetData.tableStart.GetRange(size);
+                    var result = await SheetData.DetectSize(sheetData);
+                    var range = sheetData.tableStart.GetRange(result.Item1);
 
                     var obj = sheet.owner as Object;
                     await SheetData.ReadFromSheet(obj, sheetData, range, "unknown");

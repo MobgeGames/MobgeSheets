@@ -53,20 +53,28 @@ namespace Mobge.Sheets {
             string rangeV = start.column + start.row + ':' + start.column;
             var ranges = new[] { rangeH, rangeV };
             await SheetCacher.Instance.TestCacher(googleSheet, Dimension.ROWS, ranges);
-            int2 size = await DetectSize(this);
-            var range = tableStart.GetRange(size);
+            var result = await DetectSize(this);
+            var range = tableStart.GetRange(result.Item1);
             await SheetCacher.Instance.TestCacher(googleSheet, Dimension.ROWS, new []{range});
         }
 
-        public static async Task UpdateFromSheet(Object obj, SheetData sheetData, string sheetDataName) {
-            int2 size = await DetectSize(sheetData);
-            var range = sheetData.tableStart.GetRange(size);
-            await ReadFromSheet(obj, sheetData, range, sheetDataName);
+        public static async Task<bool> UpdateFromSheet(Object obj, SheetData sheetData, string sheetDataName) {
+            var result = await DetectSize(sheetData);
+            if (!result.Item2) {
+                return false;
+            }
+            var range = sheetData.tableStart.GetRange(result.Item1);
+            if (!await ReadFromSheet(obj, sheetData, range, sheetDataName)) {
+                return false;
+            }
+
+            return true;
         }
-        public static async Task<int2> DetectSize(SheetData go) {
-            return (await DetectSizeAndHeader(go)).Item1;
+        public static async Task<(int2, bool)> DetectSize(SheetData go) {
+            var result = (await DetectSizeAndHeader(go));
+            return (result.Item1, result.Item3);
         }
-        public static async Task<(int2, JSONArray)> DetectSizeAndHeader(SheetData sheetData) {
+        public static async Task<(int2, JSONArray, bool)> DetectSizeAndHeader(SheetData sheetData) {
             var start = sheetData.tableStart;
             if (string.IsNullOrEmpty(start.column)) {
                 start.column = "A";
@@ -82,7 +90,9 @@ namespace Mobge.Sheets {
             if (Application.isEditor) {
                 nodes = await sheetData.googleSheet.GetValues(Dimension.ROWS, rangeH, rangeV);
             } else {
-                SheetCacher.Instance.TryGetValues(sheetData.googleSheet, Dimension.ROWS, new[] { rangeH, rangeV }, out nodes);
+                if (!SheetCacher.Instance.TryGetValues(sheetData.googleSheet, Dimension.ROWS, new[] { rangeH, rangeV }, out nodes)) {
+                    return default;
+                }
             }
             
             if (nodes.IsNullOrEmpty()) {
@@ -118,7 +128,7 @@ namespace Mobge.Sheets {
             }
 
 
-            return (size, header);
+            return (size, header, true);
         }
 
         public static string ResultToText(JSONArray[] nodes)
@@ -133,7 +143,7 @@ namespace Mobge.Sheets {
             return sb.ToString();
         }
 
-        public static async Task ReadFromSheet(Object obj, SheetData sheetData, string range, string sheetDataName)
+        public static async Task<bool> ReadFromSheet(Object obj, SheetData sheetData, string range, string sheetDataName)
         {
             JSONArray[] result;
             // if (Application.isEditor && false) {
@@ -141,7 +151,7 @@ namespace Mobge.Sheets {
                 result = await sheetData.googleSheet.GetValues(Dimension.ROWS, range);
             } else {
                 if (!SheetCacher.Instance.TryGetValues(sheetData.googleSheet, Dimension.ROWS, new []{range}, out result)) {
-                    return;
+                    return false;
                 }
             }
             var nodes = result[0];
@@ -190,6 +200,7 @@ namespace Mobge.Sheets {
 
             sheetData.UpdateData(data);
             Debug.Log(ctx.report, obj);
+            return true;
         }
         
         private static void CreateReportHeader(Object obj, string sheetDataName, string label, CellContext ctx, int rowCount) {
