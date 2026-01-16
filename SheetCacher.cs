@@ -50,9 +50,6 @@ namespace Mobge.Sheets  {
 		
 		public bool TryGetValues(string spreadSheetId, string sheetName, Dimension dimension, string[] ranges, out JSONArray[] result) {
 			Debug.Log($"Trying to get sheet data from cache {spreadSheetId}");
-			foreach (var range in ranges) {
-				Debug.Log("Range " + range);
-			}
 			var filePath = Path.Combine(RootFolderPath, spreadSheetId, sheetName + ".csv");
 			if (!File.Exists(filePath)) {
 				Debug.Log($"Sheet not found on cache {spreadSheetId}");
