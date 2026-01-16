@@ -29,7 +29,7 @@ namespace Mobge.Sheets  {
 		}
 
 		public async Task TestCacher(GoogleSheet sheet, Dimension dimension, string[] ranges) {
-			Debug.Log($"Testing cacher on {sheet.sheetName}.");
+			Debug.Log($"Testing cacher on {sheet.sheetName}, {ranges}.");
 			var hasCache = TryGetValues(sheet.sheetId, sheet.sheetName, dimension, ranges, out var cacheResult);
 			if (!hasCache) {
 				Debug.Log($"The sheet is not cached, was not able to test on {sheet.sheetName}.");

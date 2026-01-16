@@ -58,23 +58,24 @@ namespace Mobge.Sheets {
             await SheetCacher.Instance.TestCacher(googleSheet, Dimension.ROWS, new []{range});
         }
 
-        public static async Task<bool> UpdateFromSheet(Object obj, SheetData sheetData, string sheetDataName) {
-            var result = await DetectSize(sheetData);
+        public static async Task<bool> UpdateFromSheet(Object obj, SheetData sheetData, string sheetDataName, bool forceUseSheetCacher = false) {
+            var result = await DetectSize(sheetData, forceUseSheetCacher);
             if (!result.Item2) {
                 return false;
             }
             var range = sheetData.tableStart.GetRange(result.Item1);
-            if (!await ReadFromSheet(obj, sheetData, range, sheetDataName)) {
+            if (!await ReadFromSheet(obj, sheetData, range, sheetDataName, forceUseSheetCacher)) {
                 return false;
             }
 
             return true;
         }
-        public static async Task<(int2, bool)> DetectSize(SheetData go) {
-            var result = (await DetectSizeAndHeader(go));
+        public static async Task<(int2, bool)> DetectSize(SheetData go, bool forceUseSheetCacher = false) {
+            var result = (await DetectSizeAndHeader(go, forceUseSheetCacher));
             return (result.Item1, result.Item3);
         }
-        public static async Task<(int2, JSONArray, bool)> DetectSizeAndHeader(SheetData sheetData) {
+        public static async Task<(int2, JSONArray, bool)> DetectSizeAndHeader(SheetData sheetData,
+            bool forceUseSheetCacher = false) {
             var start = sheetData.tableStart;
             if (string.IsNullOrEmpty(start.column)) {
                 start.column = "A";
@@ -87,7 +88,7 @@ namespace Mobge.Sheets {
 
             JSONArray[] nodes;
             // if (Application.isEditor && false) {
-            if (Application.isEditor) {
+            if (Application.isEditor && !forceUseSheetCacher) {
                 nodes = await sheetData.googleSheet.GetValues(Dimension.ROWS, rangeH, rangeV);
             } else {
                 if (!SheetCacher.Instance.TryGetValues(sheetData.googleSheet, Dimension.ROWS, new[] { rangeH, rangeV }, out nodes)) {
@@ -143,11 +144,12 @@ namespace Mobge.Sheets {
             return sb.ToString();
         }
 
-        public static async Task<bool> ReadFromSheet(Object obj, SheetData sheetData, string range, string sheetDataName)
+        public static async Task<bool> ReadFromSheet(Object obj, SheetData sheetData, string range,
+            string sheetDataName, bool forceUseSheetCacher = false)
         {
             JSONArray[] result;
             // if (Application.isEditor && false) {
-            if (Application.isEditor) {
+            if (Application.isEditor && !forceUseSheetCacher) {
                 result = await sheetData.googleSheet.GetValues(Dimension.ROWS, range);
             } else {
                 if (!SheetCacher.Instance.TryGetValues(sheetData.googleSheet, Dimension.ROWS, new []{range}, out result)) {
