@@ -78,8 +78,13 @@ namespace Mobge.Sheets  {
 								if (grid[y].Length <= x) {
 									continue;
 								}
-								
-								json.Add(grid[y][x]);
+
+								if (string.IsNullOrEmpty(grid[y][x])) {
+									json.Add(new JSONData(String.Empty));
+									
+								} else {
+									json.Add(grid[y][x]);
+								}
 							}
 
 							rangeResult.Add(json);
@@ -92,12 +97,16 @@ namespace Mobge.Sheets  {
 								if (grid[y].Length <= x) {
 									continue;
 								}
-								json.Add(grid[y][x]);
+								
+								if (string.IsNullOrEmpty(grid[y][x])) {
+									json.Add(new JSONData(String.Empty));
+									
+								} else {
+									json.Add(grid[y][x]);
+								}
 							}
 							
-							if (json.Count > 0) {
-								rangeResult.Add(json);
-							}
+							rangeResult.Add(json);
 						}
 					}
 
