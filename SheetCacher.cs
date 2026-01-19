@@ -110,17 +110,19 @@ namespace Mobge.Sheets  {
 						}
 					}
 
-					for (int j = rangeResult.Count - 1; j >= 0; j--) {
+					for (int j = 0; j < rangeResult.Count; j++) {
 						var json = rangeResult[j];
-						bool found = false;
-						for (int k = 0; k < json.Count; k++) {
+						for (int k = json.Count - 1; k >= 0; k--) {
 							if (!string.IsNullOrEmpty(json[k])) {
-								found = true;
 								break;
 							}
-						}
 
-						if (found) {
+							json.Remove(k);
+						}
+					}
+
+					for (int j = rangeResult.Count - 1; j >= 0; j--) {
+						if (rangeResult[j].Count > 0) {
 							break;
 						}
 
@@ -256,8 +258,6 @@ namespace Mobge.Sheets  {
 			var url = $"https://sheets.googleapis.com/v4/spreadsheets/{spreadsheetId}/values:batchGet?";
 			foreach (var sheet in sheetNames)
 				url += $"ranges={UnityWebRequest.EscapeURL(sheet)}&";
-
-			url += "valueRenderOption=UNFORMATTED_VALUE";
 
 			Debug.Log($"Requesting batch download...");
 			var req = UnityWebRequest.Get(url);
