@@ -22,6 +22,7 @@ namespace Mobge.Sheets  {
 		}
 		
 		private static string RootFolderPath => Path.Combine(Application.persistentDataPath, "Sheets");
+		private Dictionary<string, string[][]> _csvContentCache = new();
 
 		public virtual bool TryGetValues(GoogleSheet sheet, Dimension dimension, string[] ranges,
 			out JSONArray[] result) {
@@ -57,8 +58,7 @@ namespace Mobge.Sheets  {
 				return false;
 			}
 			
-			var raw = File.ReadAllText(filePath);
-			var grid = ParseCsv(raw);
+			var grid = GetCsvContent(filePath);
 			
 			int rowCount = grid.Length;
 			int colCount = 0;
@@ -139,6 +139,17 @@ namespace Mobge.Sheets  {
 			Debug.Log($"Sheet found on cache returning result {spreadSheetId}");
 			return true;
 		}
+
+		private string[][] GetCsvContent(string filePath) {
+			if (!_csvContentCache.TryGetValue(filePath, out var csvContent)) {
+				var raw = File.ReadAllText(filePath);
+				csvContent = ParseCsv(raw);
+				_csvContentCache.Add(filePath, csvContent);
+			}
+			
+			return csvContent;
+		}
+		
 		protected string[][] ParseCsv(string text) {
 			var lines = text.Split('\n');
 			var result = new string[lines.Length][];
