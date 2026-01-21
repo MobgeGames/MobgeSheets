@@ -287,7 +287,9 @@ namespace Mobge.Sheets  {
 
 			var data = GA_MiniJSON.Deserialize(json) as Dictionary<string, object>;
 			var tempFolderPath = Path.Combine(RootFolderPath, $"{spreadsheetId}_temp");
-			Directory.Delete(tempFolderPath, true);
+			if (Directory.Exists(tempFolderPath)) {
+				Directory.Delete(tempFolderPath, true);
+			}
 			if (data != null && data.ContainsKey("valueRanges")) {
 				var valueRanges = data["valueRanges"] as List<object>;
 				foreach (var rangeObj in valueRanges) {
