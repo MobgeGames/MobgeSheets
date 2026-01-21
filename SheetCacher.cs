@@ -286,8 +286,8 @@ namespace Mobge.Sheets  {
 			// Debug.Log($"Batch JSON: {json}"); // Too large to log typically
 
 			var data = GA_MiniJSON.Deserialize(json) as Dictionary<string, object>;
-			var rnd = Random.Range(1000, 10000);
-			var tempFolderPath = Path.Combine(RootFolderPath, $"{spreadsheetId}_{rnd}");
+			var tempFolderPath = Path.Combine(RootFolderPath, $"{spreadsheetId}_temp");
+			Directory.Delete(tempFolderPath, true);
 			if (data != null && data.ContainsKey("valueRanges")) {
 				var valueRanges = data["valueRanges"] as List<object>;
 				foreach (var rangeObj in valueRanges) {
