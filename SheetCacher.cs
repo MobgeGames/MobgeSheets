@@ -24,6 +24,12 @@ namespace Mobge.Sheets  {
 		private static string RootFolderPath => Path.Combine(Application.persistentDataPath, "Sheets");
 		private Dictionary<string, string[][]> _csvContentCache = new();
 
+		public void DeleteCaches() {
+			if (Directory.Exists(RootFolderPath)) {
+				Directory.Delete(RootFolderPath, true);
+			}
+		}
+
 		public virtual bool TryGetValues(GoogleSheet sheet, Dimension dimension, string[] ranges,
 			out JSONArray[] result) {
 			return TryGetValues(sheet.sheetId, sheet.sheetName, dimension, ranges, out result);
