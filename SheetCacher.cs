@@ -292,10 +292,17 @@ namespace Mobge.Sheets  {
 			// Debug.Log($"Batch JSON: {json}"); // Too large to log typically
 
 			var data = GA_MiniJSON.Deserialize(json) as Dictionary<string, object>;
-			var tempFolderPath = Path.Combine(RootFolderPath, $"{spreadsheetId}_temp");
+
+			var rootFolderPath = RootFolderPath;
+			if (!Directory.Exists(rootFolderPath)) {
+				Directory.CreateDirectory(rootFolderPath);
+			}
+			
+			var tempFolderPath = Path.Combine(rootFolderPath, $"{spreadsheetId}_temp");
 			if (Directory.Exists(tempFolderPath)) {
 				Directory.Delete(tempFolderPath, true);
 			}
+			
 			if (data != null && data.ContainsKey("valueRanges")) {
 				var valueRanges = data["valueRanges"] as List<object>;
 				foreach (var rangeObj in valueRanges) {
@@ -326,7 +333,7 @@ namespace Mobge.Sheets  {
 					await SaveCsv(tempFolderPath, range, csv);
 				}
 				
-				var newFolderPath = Path.Combine(RootFolderPath, spreadsheetId);
+				var newFolderPath = Path.Combine(rootFolderPath, spreadsheetId);
 				Directory.Move(tempFolderPath, newFolderPath);
 			}
 		}
