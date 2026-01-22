@@ -25,6 +25,7 @@ namespace Mobge.Sheets  {
 		private Dictionary<string, string[][]> _csvContentCache = new();
 
 		public void DeleteCaches() {
+			Debug.Log("Deleting sheet caches");
 			if (Directory.Exists(RootFolderPath)) {
 				Directory.Delete(RootFolderPath, true);
 			}
