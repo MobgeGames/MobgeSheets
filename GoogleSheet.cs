@@ -6,19 +6,26 @@ using System.Text;
 using System.Threading.Tasks;
 using UnityEngine;
 using SimpleJSON;
-using Mobge.DoubleKing;
 using Unity.Mathematics;
 using UnityEngine.Networking;
+using UnityEngine.Serialization;
 using UnityEngine.UI;
 
 namespace Mobge.Sheets {
     [Serializable]
     public class GoogleSheet {
-        public string sheetId;
+        [FormerlySerializedAs("sheetId")] [SerializeField] private string sheetIdOverride;
         public string sheetName;
 
+        public static string OverrideSheetIdPropertyName => nameof(sheetIdOverride);
+        
+        public string SheetId {
+            get => string.IsNullOrEmpty(sheetIdOverride) ? GoogleSheetCredentials.Instance.defaultSheetId : sheetIdOverride;
+            set => sheetIdOverride = value;
+        }
+
         public async Task<int> GetSheetTabId() {
-            UriBuilder b = new UriBuilder($"https://sheets.googleapis.com/v4/spreadsheets/{sheetId}");
+            UriBuilder b = new UriBuilder($"https://sheets.googleapis.com/v4/spreadsheets/{SheetId}");
             b.AddParameter("ranges", sheetName);
             var req = UnityWebRequest.Get(b.Uri);
             bool success = await GoogleAuthenticator.Instance.TryAddAuthentication(req);
@@ -39,7 +46,7 @@ namespace Mobge.Sheets {
 
         public async Task<JSONArray[]> GetValues(Dimension d, params string[] ranges) {
             var uri = new UriBuilder();
-            uri.Reset($"https://sheets.googleapis.com/v4/spreadsheets/{sheetId}/values:batchGet");
+            uri.Reset($"https://sheets.googleapis.com/v4/spreadsheets/{SheetId}/values:batchGet");
             uri.AddParameter("majorDimension", d.ToString());
             for(int i = 0; i < ranges.Length; i++) {
                 uri.AddParameter("ranges", sheetName + "!" + ranges[i]);
@@ -99,7 +106,7 @@ namespace Mobge.Sheets {
                 }
             }
             
-            string uri = $"https://sheets.googleapis.com/v4/spreadsheets/{this.sheetId}:batchUpdate";
+            string uri = $"https://sheets.googleapis.com/v4/spreadsheets/{this.SheetId}:batchUpdate";
             var req = new UnityWebRequest(uri, "POST");
             req.downloadHandler = new DownloadHandlerBuffer();
             byte[] bodyRaw = Encoding.UTF8.GetBytes(jRoot.ToString());
@@ -122,7 +129,7 @@ namespace Mobge.Sheets {
         public async Task PutValues(Dimension d, JSONArray values, string range) {
             range = sheetName + "!" + range;
             UriBuilder b = new();
-            b.Reset($"https://sheets.googleapis.com/v4/spreadsheets/{sheetId}/values/{range}");
+            b.Reset($"https://sheets.googleapis.com/v4/spreadsheets/{SheetId}/values/{range}");
             b.AddParameter("valueInputOption", "RAW");
             
             var req = new UnityWebRequest(b.Uri, "PUT");

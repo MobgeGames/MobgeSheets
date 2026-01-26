@@ -95,7 +95,7 @@ namespace Mobge.Sheets
                 }
                 foreach (var sheetData in sheetDataArray)
                 {
-                    if (sheetData == null || string.IsNullOrEmpty(sheetData.googleSheet.sheetId))
+                    if (sheetData == null || string.IsNullOrEmpty(sheetData.googleSheet.SheetId))
                     {
                         continue;
                     }
@@ -116,7 +116,7 @@ namespace Mobge.Sheets
 
                 foreach (var sheetData in sheetDataArray)
                 {
-                    if (sheetData == null || string.IsNullOrEmpty(sheetData.googleSheet.sheetId))
+                    if (sheetData == null || string.IsNullOrEmpty(sheetData.googleSheet.SheetId))
                     {
                         continue;
                     }

@@ -4,7 +4,6 @@ using System.IO;
 using System.Text;
 using System.Threading.Tasks;
 using GameAnalyticsSDK.Utilities;
-using Mobge.DoubleKing;
 using SimpleJSON;
 using UnityEngine;
 using UnityEngine.Networking;
@@ -33,12 +32,12 @@ namespace Mobge.Sheets  {
 
 		public virtual bool TryGetValues(GoogleSheet sheet, Dimension dimension, string[] ranges,
 			out JSONArray[] result) {
-			return TryGetValues(sheet.sheetId, sheet.sheetName, dimension, ranges, out result);
+			return TryGetValues(sheet.SheetId, sheet.sheetName, dimension, ranges, out result);
 		}
 
 		public async Task TestCacher(GoogleSheet sheet, Dimension dimension, string[] ranges) {
 			Debug.Log($"Testing cacher on {sheet.sheetName}, {ranges}.");
-			var hasCache = TryGetValues(sheet.sheetId, sheet.sheetName, dimension, ranges, out var cacheResult);
+			var hasCache = TryGetValues(sheet.SheetId, sheet.sheetName, dimension, ranges, out var cacheResult);
 			if (!hasCache) {
 				Debug.Log($"The sheet is not cached, was not able to test on {sheet.sheetName}.");
 				return;

@@ -25,13 +25,14 @@ namespace Mobge.Sheets {
                 return;
             }
             EditorGUI.indentLevel++;
-            PropertyField(property.FindPropertyRelative(nameof(GoogleSheet.sheetId)));
+            PropertyField(property.FindPropertyRelative(GoogleSheet.OverrideSheetIdPropertyName));
+            
             PropertyField(property.FindPropertyRelative(nameof(GoogleSheet.sheetName)));
             EditorGUI.indentLevel--;
         }
         private async void OpenPage(GoogleSheet sheet) {
             int tableId = await sheet.GetSheetTabId();
-            UriBuilder b = new UriBuilder($"https://docs.google.com/spreadsheets/d/{sheet.sheetId}/edit");
+            UriBuilder b = new UriBuilder($"https://docs.google.com/spreadsheets/d/{sheet.SheetId}/edit");
             b.AddParameter("gid", tableId.ToString());
             System.Diagnostics.Process.Start(b.Uri);
             Debug.Log("open page");     

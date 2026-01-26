@@ -10,7 +10,7 @@ using UnityEditor;
 using UnityEngine;
 using UnityEngine.Networking;
 
-namespace Mobge.DoubleKing {
+namespace Mobge.Sheets {
     public class GoogleAuthenticator {
         public const string c_authorizationEndpoint = "https://accounts.google.com/o/oauth2/v2/auth";
         public const string c_tokenEndpoint = "https://oauth2.googleapis.com/token";
