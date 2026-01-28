@@ -13,6 +13,8 @@ namespace Mobge.Sheets  {
 	//TODO made instance
 	public class SheetCacher {
 
+		private const char SeperatorChar = ';';
+		
 		public static SheetCacher _instance;
 		public static SheetCacher Instance => _instance ??= new SheetCacher();
 
@@ -160,7 +162,7 @@ namespace Mobge.Sheets  {
 			var lines = text.Split('\n');
 			var result = new string[lines.Length][];
 			for (var index = 0; index < lines.Length; index++) {
-				result[index] = lines[index].Split(',');
+				result[index] = lines[index].Split(SeperatorChar);
 			}
 			return result;
 		}
@@ -350,12 +352,12 @@ namespace Mobge.Sheets  {
 					string cell = row[i] ?? "";
 
 					// CSV escape
-					if (cell.Contains(",") || cell.Contains("\"") || cell.Contains("\n"))
+					if (cell.Contains(SeperatorChar) || cell.Contains("\"") || cell.Contains("\n"))
 						cell = $"\"{cell.Replace("\"", "\"\"")}\"";
 
 					sb.Append(cell);
 					if (i < row.Count - 1)
-						sb.Append(",");
+						sb.Append(SeperatorChar);
 				}
 				sb.AppendLine();
 			}
