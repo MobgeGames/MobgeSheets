@@ -339,17 +339,17 @@ namespace Mobge.Sheets  {
 				Directory.Move(tempFolderPath, newFolderPath);
 			}
 		}
-		protected static string ConvertToCsv(List<List<string>> rows)
-		{
+		protected static string ConvertToCsv(List<List<string>> rows) {
 			if (rows == null) return "";
 
 			var sb = new StringBuilder();
 
-			foreach (var row in rows)
-			{
-				for (int i = 0; i < row.Count; i++)
-				{
+			foreach (var row in rows) {
+				for (int i = 0; i < row.Count; i++) {
 					string cell = row[i] ?? "";
+
+					// normalize line endings inside cell
+					cell = cell.Replace("\r\n", "\n").Replace("\r", "\n");
 
 					// CSV escape
 					if (cell.Contains(SeperatorChar) || cell.Contains("\"") || cell.Contains("\n"))
@@ -359,7 +359,9 @@ namespace Mobge.Sheets  {
 					if (i < row.Count - 1)
 						sb.Append(SeperatorChar);
 				}
-				sb.AppendLine();
+
+				// explicit newline (platform-independent)
+				sb.Append('\n');
 			}
 
 			return sb.ToString();
