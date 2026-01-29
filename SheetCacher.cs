@@ -14,6 +14,8 @@ namespace Mobge.Sheets  {
 	public class SheetCacher {
 
 		private const char SeperatorChar = ';';
+		private const string ParentFolderName = "Sheets";
+		private const int Version = 1;
 		
 		public static SheetCacher _instance;
 		public static SheetCacher Instance => _instance ??= new SheetCacher();
@@ -22,7 +24,7 @@ namespace Mobge.Sheets  {
 			_instance = sheetCacher;
 		}
 		
-		private static string RootFolderPath => Path.Combine(Application.persistentDataPath, "Sheets");
+		private static string RootFolderPath => Path.Combine(Application.persistentDataPath, $"Sheets_v{Version}");
 		private Dictionary<string, string[][]> _csvContentCache = new();
 
 		public void DeleteCaches() {
@@ -294,8 +296,16 @@ namespace Mobge.Sheets  {
 			// Debug.Log($"Batch JSON: {json}"); // Too large to log typically
 
 			var data = GA_MiniJSON.Deserialize(json) as Dictionary<string, object>;
-
+			
 			var rootFolderPath = RootFolderPath;
+			var parentRootFolderPath = Directory.GetParent(rootFolderPath);
+			var directories = parentRootFolderPath.GetDirectories();
+			foreach (var directoryInfo in directories) {
+				if (directoryInfo.Name.StartsWith("Sheets") && directoryInfo.Name != rootFolderPath) {
+					Directory.Delete(directoryInfo.FullName, true);
+				}
+			}
+
 			if (!Directory.Exists(rootFolderPath)) {
 				Directory.CreateDirectory(rootFolderPath);
 			}
