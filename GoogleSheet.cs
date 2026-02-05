@@ -20,7 +20,12 @@ namespace Mobge.Sheets {
         public static string OverrideSheetIdPropertyName => nameof(sheetIdOverride);
         
         public string SheetId {
-            get => string.IsNullOrEmpty(sheetIdOverride) ? GoogleSheetCredentials.Instance.defaultSheetId : sheetIdOverride;
+            get {
+                var sheetId = sheetIdOverride.Trim();
+                return string.IsNullOrEmpty(sheetId)
+                    ? GoogleSheetCredentials.Instance.defaultSheetId.Trim()
+                    : sheetId;
+            }
             set => sheetIdOverride = value;
         }
 
