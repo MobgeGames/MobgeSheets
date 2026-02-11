@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using UnityEngine;
 using SimpleJSON;
@@ -21,12 +22,16 @@ namespace Mobge.Sheets {
         
         public string SheetId {
             get {
-                var sheetId = sheetIdOverride.Trim();
+                var sheetId = CleanSheetId(sheetIdOverride);
                 return string.IsNullOrEmpty(sheetId)
-                    ? GoogleSheetCredentials.Instance.defaultSheetId.Trim()
+                    ? CleanSheetId(GoogleSheetCredentials.Instance.defaultSheetId)
                     : sheetId;
             }
             set => sheetIdOverride = value;
+        }
+
+        public string CleanSheetId(string sheetId) {
+            return Regex.Replace(sheetId.Trim(), @"\s+", "");
         }
 
         public async Task<int> GetSheetTabId() {
