@@ -22,15 +22,15 @@ namespace Mobge.Sheets {
         
         public string SheetId {
             get {
-                var sheetId = CleanSheetId(sheetIdOverride);
+                var sheetId = TrimStringWithLineEndings(sheetIdOverride);
                 return string.IsNullOrEmpty(sheetId)
-                    ? CleanSheetId(GoogleSheetCredentials.Instance.defaultSheetId)
+                    ? TrimStringWithLineEndings(GoogleSheetCredentials.Instance.defaultSheetId)
                     : sheetId;
             }
             set => sheetIdOverride = value;
         }
 
-        public string CleanSheetId(string sheetId) {
+        public static string TrimStringWithLineEndings(string sheetId) {
             return Regex.Replace(sheetId.Trim(), @"\s+", "");
         }
 
