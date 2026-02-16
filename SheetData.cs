@@ -185,14 +185,14 @@ namespace Mobge.Sheets {
                         for (int v = 0; v < values.Length; v++)
                         {
                             string arrValue = values[v];
-                            var o = ConvertToObject(arrValue, field, ctx.mappings[iField], ctx);
+                            var o = ConvertToObject(arrValue, field, ctx.mappings[iField], ref ctx);
                             arr.SetValue(o, v);
                         }
                         value = arr;
                     }
                     else
                     {
-                        value = ConvertToObject(textValue, field, ctx.mappings[iField], ctx);
+                        value = ConvertToObject(textValue, field, ctx.mappings[iField], ref ctx);
                     }
                     field.SetValue(rowData, value);
 
@@ -201,7 +201,8 @@ namespace Mobge.Sheets {
             }
 
             sheetData.UpdateData(data);
-            Debug.Log(ctx.report, obj);
+            if (ctx.isError) Debug.LogError(ctx.report, obj);
+            else Debug.Log(ctx.report, obj);
             return true;
         }
         
@@ -217,7 +218,7 @@ namespace Mobge.Sheets {
         }
 
         
-        private static object ConvertToObject(string textValue, SheetData.Field field, SheetData.AMapping mapping, in CellContext ctx) {
+        private static object ConvertToObject(string textValue, SheetData.Field field, SheetData.AMapping mapping, ref CellContext ctx) {
             textValue = textValue.Trim(SheetData.s_trimChars);
             object value = null;
             if (IsPrimitive(field.type)) {
@@ -231,6 +232,7 @@ namespace Mobge.Sheets {
                         var ts = ctx.sheetData.tableStart;
                         ts.column = CellId.Add(ts.column, ctx.columnIndex);
                         ts.row += ctx.rowIndex + 1;
+                        ctx.isError = true;
                         ctx.report.AppendLine($"Mapping error at cell: {ts.column}:{ts.row}");
                     }
                 }
@@ -292,10 +294,12 @@ namespace Mobge.Sheets {
                 }
                 ctx.columnIndexes[i] = selectedIndex;
                 if (selectedIndex < 0) {
+                    ctx.isError = true;
                     ctx.report.AppendLine("No column found for field: " + field.Name);
                 }
 
                 if (!IsPrimitive(field.type) && ctx.mappings[i] == null) {
+                    ctx.isError = true;
                     ctx.report.AppendLine("No mapping found for column: " + field.Name);
                 }
             }
@@ -329,6 +333,7 @@ namespace Mobge.Sheets {
 
         public struct CellContext {
             public StringBuilder report;
+            public bool isError;
             public int columnIndex;
             public int rowIndex;
             public SheetData sheetData;

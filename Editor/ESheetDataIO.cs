@@ -236,17 +236,19 @@ namespace Mobge.Sheets {
             
             ctx.report.AppendLine($"{dataProperty.arraySize} rows of data exported from Unity to Google Sheets.");
 
-            if (ctx.emptyFields.Count > 0)
-            {
+            if (ctx.emptyFields.Count > 0) {
+                ctx.isError = true;
                 ctx.report.AppendLine($"Fields without mapping ({ctx.emptyFields.Count}): {string.Join(", ", ctx.emptyFields)}");
             }
 
             if (ctx.emptyValueCount > 0)
             {
+                ctx.isError = true;
                 ctx.report.AppendLine($"Total {ctx.emptyValueCount} cells written with empty values.");
             }
 
-            Debug.Log(ctx.report, p?.serializedObject.targetObject);
+            if (ctx.isError) Debug.LogError(ctx.report, p?.serializedObject.targetObject);
+            else Debug.Log(ctx.report, p?.serializedObject.targetObject);
         }
         private static SerializedProperty FindFieldProperty(SerializedProperty rowProperty, Field field)
         {
