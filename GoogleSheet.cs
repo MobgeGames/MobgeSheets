@@ -58,6 +58,7 @@ namespace Mobge.Sheets {
             var uri = new UriBuilder();
             uri.Reset($"https://sheets.googleapis.com/v4/spreadsheets/{SheetId}/values:batchGet");
             uri.AddParameter("majorDimension", d.ToString());
+            uri.AddParameter("valueRenderOption", "UNFORMATTED_VALUE");
             for(int i = 0; i < ranges.Length; i++) {
                 uri.AddParameter("ranges", sheetName + "!" + ranges[i]);
             }
@@ -150,7 +151,7 @@ namespace Mobge.Sheets {
             c["values"] = values;
             c["majorDimension"] = d.ToString();
             
-            byte[] bodyRaw = Encoding.UTF8.GetBytes(c.ToString());
+            byte[] bodyRaw = Encoding.UTF8.GetBytes(c.ToJSON(0));
             req.uploadHandler = new UploadHandlerRaw(bodyRaw);
             req.SetRequestHeader("Content-Type", "application/json;charset=UTF-8");
             
