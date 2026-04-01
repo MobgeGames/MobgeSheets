@@ -134,13 +134,13 @@ namespace Mobge.Sheets {
             await UpdateDropdownsCommon(_go, rowCount, ctx);
         }
         private async void TryUpdateDropdowns(SheetData go) {
-            var (size, header, success) = await DetectSizeAndHeader(go);
-            if (size.y < 2) {
+            var meta = await DetectSizeAndHeader(go);
+            if (meta.size.y < 2) {
                 Debug.LogError("Table has no rows.");
                 return;
             }
-            var ctx = FindMapping(go, header);
-            await UpdateDropdownsCommon(go, size.y - 1, ctx);
+            var ctx = FindMapping(go, meta.header);
+            await UpdateDropdownsCommon(go, meta.size.y - 1, ctx);
 
         }
         public static async Task WriteToSheet(SerializedProperty p) {
@@ -154,11 +154,11 @@ namespace Mobge.Sheets {
                 Debug.LogError("No serializable fields found in data type.");
                 return;
             }
-            var (size, header, success) = await DetectSizeAndHeader(go);
+            var meta = await DetectSizeAndHeader(go);
             
             var dataProperty = p.FindPropertyRelative("data");
             int totalRows = dataProperty.arraySize;
-            int2 writeSize = new int2(size.x, totalRows);
+            int2 writeSize = new int2(meta.size.x, totalRows);
             var start = go.tableStart + new int2(0, 1);
             string range = start.GetRange(writeSize);
 
@@ -183,13 +183,13 @@ namespace Mobge.Sheets {
                 Debug.LogError("No data found in Unity to export.");
                 return;
             }
-            if (size.x == 0)
+            if (meta.size.x == 0)
             {
                 Debug.LogError("Header is not found.");
                 return;
             }
 
-            CellContext ctx = FindMapping(go, header);
+            CellContext ctx = FindMapping(go, meta.header);
             CreateReportHeader(p, "Writing To Sheet", ctx, dataProperty.arraySize);
 
             JSONArray root = new JSONArray();

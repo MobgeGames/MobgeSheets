@@ -53,8 +53,17 @@ namespace Mobge.Sheets {
             return json["sheets"][0]["properties"]["sheetId"].AsInt;
         }
 
-
         public async Task<JSONArray[]> GetValues(Dimension d, params string[] ranges) {
+            return await GetValues(d, false, ranges);
+        }
+
+        public async Task<JSONArray[]> GetValues(Dimension d, bool useCacher, params string[] ranges) {
+            if(!Application.isEditor || useCacher) {
+                if(SheetCacher.Instance.TryGetValues(this, d, ranges, out var rr)) {
+                    return rr;
+                }
+                return default;
+            }
             var uri = new UriBuilder();
             uri.Reset($"https://sheets.googleapis.com/v4/spreadsheets/{SheetId}/values:batchGet");
             uri.AddParameter("majorDimension", d.ToString());
