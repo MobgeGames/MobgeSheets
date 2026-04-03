@@ -193,6 +193,9 @@ namespace Mobge.Sheets {
             {
                 var rowProperty = dataProperty.GetArrayElementAtIndex(rowIndex);
                 JSONArray dataRow = new JSONArray();
+                for(int i = 0; i < ctx.header.row.Count; i++) {
+                    dataRow.Add("");
+                }
 
                 for(int i = 0; i < ctx.header.columns.Count; i++) {
                     var c = ctx.header.columns[i];
