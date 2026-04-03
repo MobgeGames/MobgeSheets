@@ -19,20 +19,14 @@ using Object = UnityEngine.Object;
 namespace Mobge.Sheets {
 	//[CreateAssetMenu(menuName = "Mobge/Sheets/Data")]
     [Serializable]
-    public sealed partial class SheetData<T> : SheetData {
+    public sealed class SheetData<T> : SheetData {
         public T[] data;
         public override Type RowType => typeof(T);
         public override void UpdateData(object[] rows) {
             this.data = rows.Cast<T>().ToArray();
-            //OnDataUpdate();
         }
         public int Count => data.Length;
-        public T this[int index] {
-            get => data[index];
-        }
-        // protected virtual void OnDataUpdate() {
-
-        // }
+        public T this[int index] => data[index];
     }
     public abstract partial class SheetData {
         public static char[] s_trimChars = new char[]{' ', '\r', '\n'};
