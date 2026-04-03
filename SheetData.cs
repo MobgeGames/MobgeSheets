@@ -157,7 +157,7 @@ namespace Mobge.Sheets {
                         continue;
                     }
                     object value;
-                    if(field.IsArray) {
+                    if(field.IsArray && c.indexes[^1] < 0) {
                         var values = textValue.Split(',');
                         var arr = Array.CreateInstance(field.type, values.Length);
                         for (int v = 0; v < values.Length; v++)

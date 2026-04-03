@@ -176,45 +176,49 @@ namespace Mobge.Sheets {
                 }
             }
             public Enumerator GetEnumerator() => new Enumerator(this);
-            private void SetValue(object obj, object value, SheetColumn column, string[] path, int depth) {
+            private bool SetValue(object obj, object value, SheetColumn column, string[] path, int depth) {
+                int arrayIndex = column.indexes[depth - 1];
+                Array arr = default;
+                if(arrayIndex >= 0) {
+                    var val = _fieldInfo.GetValue(obj);
+                    if(val == null) {
+                        val = Activator.CreateInstance(_fieldInfo.FieldType, arrayIndex + 1);
+                    }
+                    arr = (Array)val;
+                    if(arr.Length < arrayIndex + 1) {
+                        var na = (Array)Activator.CreateInstance(_fieldInfo.FieldType, arrayIndex + 1);
+                        Array.Copy(arr, na, arr.Length);
+                        arr = na;
+                    }
+                }
+                object ownValue;
                 if(childs == null) {
-                    _fieldInfo.SetValue(obj, value);
+                    ownValue = value;
                 }
                 else {
                     string name = path[depth];
                     if(!TryGetChild(name, out var cf)) {
-                        return;
+                        return false;
                     }
-                    int arrayIndex = column.indexes[depth - 1];
-                    var ownValue = _fieldInfo.GetValue(obj);
                     if(arrayIndex >= 0) {
-                        if(ownValue == null) {
-                            ownValue = Activator.CreateInstance(_fieldInfo.FieldType, arrayIndex + 1);
-                        }
-                        
-                        Array a = (Array)ownValue;
-                        if(a.Length < arrayIndex + 1) {
-                            var na = (Array)Activator.CreateInstance(_fieldInfo.FieldType, arrayIndex + 1);
-                            Array.Copy(a, na, a.Length);
-                            a = na;
-                        }
-                        var element = a.GetValue(arrayIndex);
-                        if(element == null) {
-                            element = Activator.CreateInstance(this.type);
-                        }
-                        cf.SetValue(element, value, column, path, depth + 1);
-                        a.SetValue(element, arrayIndex);
-                        ownValue = a;
-                        
+                        ownValue = arr.GetValue(arrayIndex);
                     }
                     else {
-                        if(ownValue == null) {
-                            ownValue = Activator.CreateInstance(_fieldInfo.FieldType);
-                        }
-                        cf.SetValue(ownValue, value, column, path, depth + 1);
+                        ownValue = _fieldInfo.GetValue(obj);
                     }
-                    _fieldInfo.SetValue(obj, ownValue);
+                    if(ownValue == null) {
+                        ownValue = Activator.CreateInstance(type);
+                    }
+                    if(!cf.SetValue(ownValue, value, column, path, depth + 1)) {
+                        return false;
+                    }
                 }
+                if(arrayIndex >= 0) {
+                    arr.SetValue(ownValue, arrayIndex);
+                    ownValue = arr;
+                }
+                _fieldInfo.SetValue(obj, ownValue);
+                return true;
             }
             public Field(FieldInfo f, bool seperateColumns, string prefix, MappingEntry[] mappingList) {
                 this._fieldInfo = f;
@@ -246,12 +250,6 @@ namespace Mobge.Sheets {
                 }
             }
             
-            private void FindMapping() {
-                if(childs != null) {
-                    return;
-                }
-
-            }
             public int PopulateTree(Type type, MappingEntry[] mappings) {
                 if (!BinarySerializer.TryGetFields(type, out var ffs)) {
                     return 0;
