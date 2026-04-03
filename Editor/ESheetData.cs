@@ -271,17 +271,19 @@ namespace Mobge.Sheets {
         }
         private void UpdateMappings(SerializedProperty pMappings, Type rowType, out int validCount) {
             _mappingRefs.Clear();
-            if (SheetData.TryGetFields(rowType, out var fields)) {
-                for (int i = 0; i < fields.Length; i++) {
-                    var field = fields[i];
-                    MappingRef mr;
-                    mr.name = field.Name;
-                    mr.valid = !SheetData.IsPrimitive(field.type);
-                    mr.index = -1;
-                    mr.fieldType = field.type;
-                    _mappingRefs.Add(mr);
-                }
+            SheetData.TryGetFields(rowType, null, out var rootField);
+            var en = rootField.GetEnumerator();
+
+            while (en.MoveNext()) {
+                var field = en.Current;
+                MappingRef mr;
+                mr.name = field.FullName;
+                mr.valid = !SheetData.IsPrimitive(field.type);
+                mr.index = -1;
+                mr.fieldType = field.type;
+                _mappingRefs.Add(mr);
             }
+        
             validCount = _mappingRefs.Count;
             for (int i = 0; i < pMappings.arraySize; i++) {
                 var m = pMappings.GetArrayElementAtIndex(i);
@@ -306,7 +308,7 @@ namespace Mobge.Sheets {
                  await WriteToSheet(property);
              }
              catch (System.Exception e) {
-                 Debug.LogError($"Error writing to Google Sheets: {e.Message}");
+                 Debug.LogException(e);
              }
          }
         

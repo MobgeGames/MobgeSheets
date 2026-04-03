@@ -19,7 +19,7 @@ using Object = UnityEngine.Object;
 namespace Mobge.Sheets {
 	//[CreateAssetMenu(menuName = "Mobge/Sheets/Data")]
     [Serializable]
-    public sealed class SheetData<T> : SheetData {
+    public sealed partial class SheetData<T> : SheetData {
         public T[] data;
         public override Type RowType => typeof(T);
         public override void UpdateData(object[] rows) {
@@ -34,7 +34,7 @@ namespace Mobge.Sheets {
 
         // }
     }
-    public abstract class SheetData {
+    public abstract partial class SheetData {
         public static char[] s_trimChars = new char[]{' ', '\r', '\n'};
         public GoogleSheet googleSheet;
         public CellId tableStart;
@@ -90,8 +90,7 @@ namespace Mobge.Sheets {
             JSONArray nodeV = nodes[1];
             int2 size = new int2(1, 1);
             JSONArray header = null;
-            if (nodeH.Count > 0)
-            {
+            if (nodeH.Count > 0) {
                 var valsH = nodeH[0].AsArray;
                 header = new JSONArray();
                 if(valsH.Count > 0) {
@@ -104,7 +103,6 @@ namespace Mobge.Sheets {
                         }
                         size.x++;
                         header.Add(valsH[i]);
-
                     }
                 }
             }
@@ -134,9 +132,10 @@ namespace Mobge.Sheets {
             return sb.ToString();
         }
 
-        public static async Task<bool> ReadFromSheet(Object obj, SheetData sheetData, string range,
-            string sheetDataName, bool forceUseSheetCacher = false)
-        {
+        public static async Task<bool> ReadFromSheet(Object obj, 
+                SheetData sheetData, string range, 
+                string sheetDataName, bool forceUseSheetCacher = false) {
+            
             JSONArray[] result = await sheetData.googleSheet.GetValues(Dimension.ROWS, forceUseSheetCacher, range);
             var nodes = result[0];
             int rowCount = nodes.Count - 1;
@@ -145,39 +144,34 @@ namespace Mobge.Sheets {
             CreateReportHeader(obj, sheetDataName, "Updating Sheet", ctx, rowCount);
 
             object[] data = new object[rowCount];
-            for (int i = 0; i < rowCount; i++)
-            {
+            
+            for (int i = 0; i < rowCount; i++) {
                 var rowCells = nodes[i + 1].AsArray;
                 object rowData = Activator.CreateInstance(sheetData.RowType);
-                for (int iField = 0; iField < ctx.fieldCount; iField++)
-                {
-                    ctx.columnIndex = ctx.columnIndexes[iField];
-                    if (ctx.columnIndex < 0)
-                    {
+                for(int a = 0; a < ctx.header.columns.Count; a++) {
+                    var c = ctx.header.columns[a];
+                    ctx.rowIndex = i;
+                    var field = c.field;
+                    var textValue = rowCells[c.columnIndex].Value;
+                    if(string.IsNullOrEmpty(textValue)) {
                         continue;
                     }
-                    ctx.rowIndex = i;
-                    var field = ctx.fields[iField];
-                    var textValue = rowCells[ctx.columnIndex].Value;
                     object value;
-                    if (field.isArray)
-                    {
+                    if(field.IsArray) {
                         var values = textValue.Split(',');
                         var arr = Array.CreateInstance(field.type, values.Length);
                         for (int v = 0; v < values.Length; v++)
                         {
                             string arrValue = values[v];
-                            var o = ConvertToObject(arrValue, field, ctx.mappings[iField], ref ctx);
+                            var o = ConvertToObject(arrValue, field, field.mapping, ref ctx);
                             arr.SetValue(o, v);
                         }
                         value = arr;
                     }
-                    else
-                    {
-                        value = ConvertToObject(textValue, field, ctx.mappings[iField], ref ctx);
+                    else {
+                        value = ConvertToObject(textValue, field, field.mapping, ref ctx);
                     }
-                    field.SetValue(rowData, value);
-
+                    ctx.rootField.SetValue(rowData, value, c);
                 }
                 data[i] = rowData;
             }
@@ -212,7 +206,7 @@ namespace Mobge.Sheets {
                     //Debug.Log($"value validated: {mapping}, {value} : {mapping.ValidateValue(value)}");
                     if (!mapping.ValidateValue(value)) {
                         var ts = ctx.sheetData.tableStart;
-                        ts.column = CellId.Add(ts.column, ctx.columnIndex);
+                        ts.column = field.FullName;
                         ts.row += ctx.rowIndex + 1;
                         ctx.isError = true;
                         ctx.report.AppendLine($"Mapping error at cell: {ts.column}:{ts.row}");
@@ -249,83 +243,12 @@ namespace Mobge.Sheets {
             }
             return value;
         }
-        
-        public static CellContext FindMapping(SheetData sheetData, JSONNode header) {
-            CellContext ctx = default;
-            ctx.sheetData = sheetData;
-            ctx.report = new StringBuilder();
-            SheetData.TryGetFields(sheetData.RowType, out ctx.fields);
-            ctx.fieldCount = ctx.fields.GetLength();
-            ctx.columnIndexes = new int[ctx.fieldCount];
-            ctx.mappings = new SheetData.AMapping[ctx.fieldCount];
-
-            ctx.emptyValueCount = 0;
-            ctx.emptyFields = new List<string>();
-
-            PopulateMappings(sheetData, ctx.fields, ctx.mappings);
-
-            for (int i = 0; i < ctx.fieldCount; i++) {
-                var field = ctx.fields[i];
-                int selectedIndex = -1;
-                for (int ih = 0; ih < header.Count; ih++) {
-                    var columnCell = header[ih];
-                    if (columnCell.Value.Equals(field.Name, StringComparison.InvariantCultureIgnoreCase)) {
-                        selectedIndex = ih;
-                        break;
-                    }
-                }
-                ctx.columnIndexes[i] = selectedIndex;
-                if (selectedIndex < 0) {
-                    ctx.isError = true;
-                    ctx.report.AppendLine("No column found for field: " + field.Name);
-                }
-
-                if (!IsPrimitive(field.type) && ctx.mappings[i] == null) {
-                    ctx.isError = true;
-                    ctx.report.AppendLine("No mapping found for column: " + field.Name);
-                }
-            }
-            return ctx;
-        }
 
         public static bool IsPrimitive(Type t) {
             return t == typeof(int) || t == typeof(string) || t == typeof(bool) || t == typeof(float) || t == typeof(long) || t == typeof(double);
         }
 
-        private static void PopulateMappings(SheetData sheetData, Field[] fields, AMapping[] mappings) {
-            for (int i = 0; i < fields.Length; i++) {
-                var field = fields[i];
 
-                if (!IsPrimitive(field.type)) {
-                    AMapping selectedMapping = null;
-                    int mappingCount = sheetData.mappings.GetLength();
-
-                    for (int im = 0; im < mappingCount; im++) {
-                        var mapping = sheetData.mappings[im];
-                        if (mapping.fieldName == field.Name) {
-                            selectedMapping = mapping.mapping;
-                            break;
-                        }
-                    }
-
-                    mappings[i] = selectedMapping;
-                }
-            }
-        }
-
-        public struct CellContext {
-            public StringBuilder report;
-            public bool isError;
-            public int columnIndex;
-            public int rowIndex;
-            public SheetData sheetData;
-            public int fieldCount;
-            public int[] columnIndexes;
-            public Field[] fields;
-            public AMapping[] mappings;
-            public int emptyValueCount;
-            public List<string> emptyFields;
-        }
 
         [Serializable]
         public struct MappingEntry {
@@ -440,86 +363,7 @@ namespace Mobge.Sheets {
                 return Enum.IsDefined(typeof(T), value);
             }
         }
-        private static bool TryGetFields(Type type, Stack<FieldInfo> parentFields, List<Field> fields) {
-            if (!BinarySerializer.TryGetFields(type, out var ffs)) {
-                return false;
-            }
-            for (int i = 0; i < ffs.Length; i++) {
-                var fieldInfo = ffs[i];
-                parentFields.Push(fieldInfo);
-                var att = fieldInfo.GetCustomAttribute<SeperateColumns>();
-                if (att != null) {
-                    Type childType = fieldInfo.FieldType;
-                    if (childType.IsArray)
-                    {
-                        childType = childType.GetElementType();
-                    }
-                    TryGetFields(fieldInfo.FieldType, parentFields, fields);
-                }
-                else {
-                    fields.Add(new Field(parentFields.Reverse().ToArray()));
-                }
-                parentFields.Pop();
-            }
-            return true;
-        }
-        public static bool TryGetFields(Type type, out Field[] fields) {
-            List<Field> r = new();
-            Stack<FieldInfo> parentFields = new();
-            TryGetFields(type, parentFields, r);
-            if (r.Count == 0) {
-                fields = null;
-                return false;
-            }
-            fields = r.ToArray();
-            return true;
-        }
-
-        public struct Field {
-            public Type type;
-            private FieldInfo[] _fieldInfos;
-            public bool isArray;
-            public string Name { get; private set; }
-            public void SetValue(object root, object value) {
-                SetValue(root, value, 0);
-            }
-            private void SetValue(object obj, object value, int index) {
-                var fInfo = _fieldInfos[index];
-                if (index == _fieldInfos.Length - 1) {
-                    fInfo.SetValue(obj, value);
-                    return;
-                }
-                var fieldValue = fInfo.GetValue(obj);
-                if (fieldValue == null) {
-                    fieldValue = Activator.CreateInstance(fInfo.FieldType);
-                }
-                SetValue(fieldValue, value, index + 1);
-                fInfo.SetValue(obj, fieldValue);
-            }
-            public Field(FieldInfo[] f) {
-                this._fieldInfos = f;
-                Name = GetName(f);
-                var t = f[^1].FieldType;
-                isArray = t.IsArray;
-                if (isArray) {
-                    type = t.GetElementType();
-                }
-                else {
-                    type = t;
-                }
-            }
-
-            private static string GetName(FieldInfo[] _fieldInfos) {
-                string s = "";
-                for (int i = 0; i < _fieldInfos.Length; i++) {
-                    if (i != 0) {
-                        s += ".";
-                    }
-                    s += _fieldInfos[i].Name;
-                }
-                return s;
-            }
-        }
+        
         [Serializable]
         public class SpriteMapping : PairMapping<Sprite> {
 

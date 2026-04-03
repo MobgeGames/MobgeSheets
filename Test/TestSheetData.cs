@@ -12,13 +12,15 @@ namespace Mobge.Sheets.Test {
             public int[] score;
             public Sprite icon;
             public ItemSet.ItemPath weapon;
-            [SeperateColumns] public Nested1 nested;
-            [SeperateColumns] public Vector3[] vector;
+            [SeperateColumns] public Nested1[] arr;
+            [SeperateColumns] public Nested1 single;
+            [SeperateColumns] public Vector3[] vectors;
         }
         [Serializable]
         public class Nested1 {
             public float val;
-            [SeperateColumns] public Nested2 nested2;
+            [SeperateColumns] public Nested2[] nArr;
+            [SeperateColumns] public Nested2 nSingle;
 
         }
         [Serializable]

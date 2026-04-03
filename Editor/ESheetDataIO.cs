@@ -14,7 +14,8 @@ using static Mobge.Sheets.SheetData;
 
 namespace Mobge.Sheets {
     public partial class ESheetData {
-        private static async Task UpdateDropdownsCommon(SheetData go, int rowCount, CellContext ctx) {
+        private static async Task UpdateDropdownsDirect(SheetData go, int rowCount, CellContext ctx) {
+            
             if (go.mappings.IsNullOrEmpty()) {
                 return;
             }
@@ -23,37 +24,23 @@ namespace Mobge.Sheets {
             List<GoogleSheet.DropDownData> dropdowns = new List<GoogleSheet.DropDownData>();
             List<string> allKeys = new List<string>();
 
-            SheetData.TryGetFields(go.RowType, out var fields);
-
-            for (int i = 0; i < go.mappings.Length; i++) {
-                var mapping = go.mappings[i];
-                if (mapping.mapping == null) continue;
-
-                int columnOffset = -1;
-                int fieldOffset = -1;
-                for (int f = 0; f < fields.Length; f++)
-                {
-                    if (fields[f].Name == mapping.fieldName)
-                    {
-                        fieldOffset = f;
-                        columnOffset = ctx.columnIndexes[f];
-                        break;
-                    }
+            for(int i = 0; i < ctx.header.columns.Count; i++) {
+                var c = ctx.header.columns[i];
+                var mapping = c.field.mapping;
+                if(mapping == null) {
+                    continue;
                 }
-
-                if (columnOffset == -1) continue;
-
                 allKeys.Clear();
-                mapping.mapping.GetAllKeys(allKeys);
-                if (allKeys.Count == 0) continue;
-
+                mapping.GetAllKeys(allKeys);
+                if(allKeys.Count == 0) continue;
+                
                 GoogleSheet.DropDownData dd;
                 dd.options = allKeys.ToArray();
                 dd.start = start.ZeroBasedIndex;
-                dd.start.x += columnOffset;
+                dd.start.x += c.columnIndex;
                 dd.start.y += 1; // Header
                 dd.size = new int2(1, rowCount);
-                dd.multiSelect = fields[fieldOffset].isArray;
+                dd.multiSelect = c.field.IsArray;
 
                 dropdowns.Add(dd);
             }
@@ -65,7 +52,14 @@ namespace Mobge.Sheets {
         public static async Task UpdateFromSheet(SerializedProperty p) {
             Undo.RecordObject(p.serializedObject.targetObject, "Update data from sheet");
             var sheetData = p.ReadObject<SheetData>(out var t);
-            await SheetData.UpdateFromSheet(p.serializedObject.targetObject, sheetData, p.propertyPath);
+            try{
+                await SheetData.UpdateFromSheet(p.serializedObject.targetObject, sheetData, p.propertyPath);
+            }
+            catch(Exception e) {
+                
+                Debug.LogException(e);
+            }
+            
             p.WriteObject(sheetData);
             p.serializedObject.ApplyModifiedProperties();
             EditorExtensions.SetDirty(p.serializedObject.targetObject);
@@ -108,11 +102,12 @@ namespace Mobge.Sheets {
         }
         private async void TryCreateTemplate(SerializedProperty p, int rowCount) {
             var _go = p.ReadObject<SheetData>(out _);
-            if (!SheetData.TryGetFields(_go.RowType, out var fields)) {
+            int fieldCount = SheetData.TryGetFields(_go.RowType, _go.mappings, out var fields);
+            if (fieldCount == 0) {
                 Debug.LogError("Data Has no serializable fields.");
                 return;
             }
-            int2 size = new int2(fields.Length, rowCount + 1);
+            int2 size = new int2(fieldCount, rowCount + 1);
             string range = _go.tableStart.GetRange(size);
             var values = await _go.googleSheet.GetValues(Dimension.ROWS, range);
             if (values == null || values.Length == 0) {
@@ -125,13 +120,14 @@ namespace Mobge.Sheets {
             }
             JSONArray root = new JSONArray();
             JSONArray row = new JSONArray();
-            for (int i = 0; i < fields.Length; i++) {
-                row.Add(fields[i].Name);
+            var en = fields.GetEnumerator();
+            while(en.MoveNext()) {
+                row.Add(en.CurrentPath);
             }
             root[0] = row;
             await _go.googleSheet.PutValues(Dimension.ROWS, root, range);
             var ctx = FindMapping(_go, row);
-            await UpdateDropdownsCommon(_go, rowCount, ctx);
+            await UpdateDropdownsDirect(_go, rowCount, ctx);
         }
         private async void TryUpdateDropdowns(SheetData go) {
             var meta = await DetectSizeAndHeader(go);
@@ -140,7 +136,7 @@ namespace Mobge.Sheets {
                 return;
             }
             var ctx = FindMapping(go, meta.header);
-            await UpdateDropdownsCommon(go, meta.size.y - 1, ctx);
+            await UpdateDropdownsDirect(go, meta.size.y - 1, ctx);
 
         }
         public static async Task WriteToSheet(SerializedProperty p) {
@@ -149,7 +145,7 @@ namespace Mobge.Sheets {
         }
         public static async Task WriteToSheet(SerializedProperty p, SheetData go)
         {
-            if (!SheetData.TryGetFields(go.RowType, out var fields))
+            if (SheetData.TryGetFields(go.RowType, go.mappings, out var rootField) == 0)
             {
                 Debug.LogError("No serializable fields found in data type.");
                 return;
@@ -191,47 +187,34 @@ namespace Mobge.Sheets {
 
             CellContext ctx = FindMapping(go, meta.header);
             CreateReportHeader(p, "Writing To Sheet", ctx, dataProperty.arraySize);
-
+            
             JSONArray root = new JSONArray();
             for (int rowIndex = 0; rowIndex < dataProperty.arraySize; rowIndex++)
             {
                 var rowProperty = dataProperty.GetArrayElementAtIndex(rowIndex);
                 JSONArray dataRow = new JSONArray();
-                
-                for (int fieldIndex = 0; fieldIndex < fields.Length; fieldIndex++)
-                {
-                    var field = fields[fieldIndex];
-                    ctx.columnIndex = ctx.columnIndexes[fieldIndex];
-                    if (ctx.columnIndex < 0)
-                    {
+
+                for(int i = 0; i < ctx.header.columns.Count; i++) {
+                    var c = ctx.header.columns[i];
+                    if(!TryFindFieldProperty(rowProperty, c, out var fp)) {
                         continue;
                     }
-                    while (dataRow.Count <= ctx.columnIndex)
-                    {
-                        dataRow.Add("");
-                    }
-                    var fieldProperty = FindFieldProperty(rowProperty, field);
-                    string cellValue = ConvertToString(fieldProperty, field, ctx.mappings[fieldIndex], ctx);
-
+                    string cellValue = ConvertToString(fp, c.field, ctx);
                     if (double.TryParse(cellValue, out var d))
                     {
                         JSONData dd = new JSONData(d);
-                        dataRow[ctx.columnIndex] = dd;
+                        dataRow[c.columnIndex] = dd;
                     }
                     else
                     {
-                        dataRow[ctx.columnIndex] = cellValue;
+                        dataRow[c.columnIndex] = cellValue;
                     }
                 }
-
                 root.Add(dataRow);
             }
-
-            
-
             await go.googleSheet.PutValues(Dimension.ROWS, root, range);
 
-            await UpdateDropdownsCommon(go, dataProperty.arraySize, ctx);
+            await UpdateDropdownsDirect(go, dataProperty.arraySize, ctx);
 
             
             ctx.report.AppendLine($"{dataProperty.arraySize} rows of data exported from Unity to Google Sheets.");
@@ -250,39 +233,46 @@ namespace Mobge.Sheets {
             if (ctx.isError) Debug.LogError(ctx.report, p?.serializedObject.targetObject);
             else Debug.Log(ctx.report, p?.serializedObject.targetObject);
         }
-        private static SerializedProperty FindFieldProperty(SerializedProperty rowProperty, Field field)
+        private static bool TryFindFieldProperty(SerializedProperty rowProperty, SheetColumn column, out SerializedProperty p)
         {
             SerializedProperty current = rowProperty;
+            p = default;
 
-            string[] pathParts = field.Name.Split('.');
+            string[] pathParts = column.fullName.Split('.');
             for (int i = 0; i < pathParts.Length; i++)
             {
                 current = current.FindPropertyRelative(pathParts[i]);
-                if (current == null)
-                {
-                    break;
+                if (current == null) {
+                    return false;
+                }
+                int arrayIndex = column.indexes[i];
+                if(arrayIndex >= 0) {
+                    if(current.arraySize <= arrayIndex) {
+                        return false;
+                    }
+                    current = current.GetArrayElementAtIndex(arrayIndex);
                 }
             }
-
-            return current;
+            p = current;
+            return true;
         }
-        private static string ConvertToString(SerializedProperty property, Field field, AMapping mapping, CellContext ctx) {
+        private static string ConvertToString(SerializedProperty property, Field field, CellContext ctx) {
             if (property == null) {
                 return "";
             }
 
-            if (field.isArray) {
+            if (field.IsArray) {
                 List<string> arrayValues = new List<string>();
                 for (int i = 0; i < property.arraySize; i++) {
                     var elementProperty = property.GetArrayElementAtIndex(i);
-                    string elementValue = ConvertSingleValueToString(elementProperty, field.type, mapping, ctx);
+                    string elementValue = ConvertSingleValueToString(elementProperty, field.type, field.mapping, ctx);
                     arrayValues.Add(elementValue);
                     
                 }
                 return string.Join(", ", arrayValues);
             }
             else {
-                return ConvertSingleValueToString(property, field.type, mapping, ctx);
+                return ConvertSingleValueToString(property, field.type, field.mapping, ctx);
             }
         }
         private static string ConvertSingleValueToString(SerializedProperty property, Type fieldType, AMapping mapping, CellContext ctx) {
