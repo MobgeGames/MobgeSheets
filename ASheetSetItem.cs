@@ -7,10 +7,10 @@ namespace Mobge.Sheets {
     public class ASheetSetItem : ISetEntry {
         [HideInInspector] public int id;
         [HideInInspector] public string name;
-        [HideInInspector] public Sprite icon;
+        [HideInInspector, SerializeField] private Sprite icon;
         
         public int Id => id;
         public string Name => name;
-        public Sprite Icon => icon;
+        public virtual Sprite Icon => icon;
     }
 }
