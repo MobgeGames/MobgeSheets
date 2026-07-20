@@ -3,11 +3,9 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text;
 using System.Threading.Tasks;
-using GameAnalyticsSDK.Utilities;
 using SimpleJSON;
 using UnityEngine;
 using UnityEngine.Networking;
-using Random = UnityEngine.Random;
 
 namespace Mobge.Sheets  {
 	//TODO made instance
@@ -256,8 +254,7 @@ namespace Mobge.Sheets  {
 			}
 			
 			var json = req.downloadHandler.text;
-			// Using MiniJSON here as well for consistency, though JsonUtility worked for this part
-			var data = GA_MiniJSON.Deserialize(json) as Dictionary<string, object>;
+			var data = JsonUtility.FromJson<Dictionary<string, object>>(json);
 			
 			List<string> sheetNames = new List<string>();
 			if (data != null && data.ContainsKey("sheets")) {
@@ -295,7 +292,7 @@ namespace Mobge.Sheets  {
 			var json = req.downloadHandler.text;
 			// Debug.Log($"Batch JSON: {json}"); // Too large to log typically
 
-			var data = GA_MiniJSON.Deserialize(json) as Dictionary<string, object>;
+			var data = JsonUtility.FromJson<Dictionary<string, object>>(json);
 			
 			var rootFolderPath = RootFolderPath;
 			var parentRootFolderPath = Directory.GetParent(rootFolderPath);
