@@ -11,6 +11,6 @@ namespace Mobge.Sheets {
         
         public int Id => id;
         public string Name => name;
-        public virtual Sprite Icon => icon;
+        public virtual Sprite Icon { get => icon; set => icon = value; }
     }
 }
