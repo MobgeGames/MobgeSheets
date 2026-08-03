@@ -19,25 +19,16 @@ namespace Mobge.Sheets {
             if (f_EnsureEditorData == null) {
                 f_EnsureEditorData = _go.GetType().GetMethod(nameof(SheetItemSet<Dummy>.EnsureEditorData));
             }
+            
             if ((bool)f_EnsureEditorData.Invoke(_go, null)) {
                 GUI.changed = true;
+
+                Undo.RecordObject(_go, "Item edit");
+                serializedObject.Update();
             }
-            Undo.RecordObject(_go, "Item edit");
-            serializedObject.Update();
-            var pKeepIdsInRows = serializedObject.FindProperty(nameof(SheetItemSet<Dummy>.keepIdsInRows));
-            EditorGUILayout.PropertyField(pKeepIdsInRows, true);
+
             var pItemsReadOnly = serializedObject.FindProperty(nameof(SheetItemSet<Dummy>.itemsReadOnly));
-            EditorGUILayout.PropertyField(pItemsReadOnly, true);
-            var pName = serializedObject.FindProperty(nameof(SheetItemSet<Dummy>.data));
-            EditorGUILayout.PropertyField(pName, true);
-            serializedObject.ApplyModifiedProperties();
-            if (pItemsReadOnly.boolValue) {
-                GUI.enabled = false;
-            }
-            base.OnInspectorGUI();
-            if (pItemsReadOnly.boolValue) {
-                GUI.enabled = true;
-            }
+            DrawInspectorGUI(pItemsReadOnly.boolValue);
         }
     }
 }
