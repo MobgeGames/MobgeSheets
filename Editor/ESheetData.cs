@@ -116,7 +116,7 @@ namespace Mobge.Sheets {
             Rect writeButtonRect = new Rect(updateButtonRect.xMax + 5f, rHeader.y, writeButtonWidth, rHeader.height);
             
             if (GUI.Button(updateButtonRect, gcUpdate)) {
-                UpdateFromSheet(property);
+                _ = UpdateFromSheet(property);
             }
             
             if (GUI.Button(writeButtonRect, gcWrite)) {
