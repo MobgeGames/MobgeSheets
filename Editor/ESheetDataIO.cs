@@ -203,9 +203,9 @@ namespace Mobge.Sheets {
                         continue;
                     }
                     string cellValue = ConvertToString(fp, c.field, ctx);
-                    if (double.TryParse(cellValue, out var d))
+                    if (double.TryParse(cellValue, NumberStyles.Float, CultureInfo.InvariantCulture, out var d))
                     {
-                        JSONData dd = new JSONData(d);
+                        JSONData dd = new JSONData(d.ToString("R", CultureInfo.InvariantCulture)) { Tag = JSONBinaryTag.DoubleValue };
                         dataRow[c.columnIndex] = dd;
                     }
                     else
