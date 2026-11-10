@@ -94,38 +94,23 @@ namespace Mobge.Sheets {
                 return;
             }
             EditorGUI.indentLevel++;
-            PropertyField(property, nameof(SheetData.googleSheet));
-            PropertyField(property, nameof(SheetData.tableStart));
-            MappingsEditor(property, go.RowType);
-            UpdateSheetField(meta, property);
-
-            PropertyField(property, nameof(SheetData<int>.data));
-            
-
-            foreach(var pp in GetExtraProperties(property)) {
-                float height = EditorGUI.GetPropertyHeight(pp);
-                EditorGUI.PropertyField(s_layout.NextRect(height), pp, true);
+            property.NextVisible(true);
+            int depth = property.depth;
+            do {
+                if(property.name == nameof(SheetData.mappings)) {
+                    MappingsField(property);
+                    UpdateSheetField(meta, property);
+                }
+                else {
+                    float height = EditorGUI.GetPropertyHeight(property);
+                EditorGUI.PropertyField(s_layout.NextRect(height), property, true);
+                }
             }
+            while(property.NextVisible(false) && property.depth == depth);
+            
             EditorGUI.indentLevel--;
             meta.height = s_layout.Height;
             return;
-        }
-        private IEnumerable<SerializedProperty> GetExtraProperties(SerializedProperty p) {
-            string[] ignoreList = new string[] {
-                nameof(SheetData.googleSheet), 
-                nameof(SheetData.tableStart),
-                nameof(SheetData<int>.data),
-                nameof(SheetData.mappings)
-            };
-            p.NextVisible(true);
-            int depth = p.depth;
-            do {
-                if(Array.IndexOf(ignoreList, p.name)>=0) {
-                    continue;
-                }
-                yield return p;
-            }
-            while(p.NextVisible(false) && p.depth == depth);
         }
 
         private void UpdateDataButton(Rect rHeader, SerializedProperty property) {
