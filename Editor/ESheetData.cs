@@ -7,6 +7,7 @@ using Mobge.Serialization;
 using SerializeReferenceEditor.Editor;
 using SerializeReferenceEditor;
 using System.Text;
+using Mobge.IdleGame;
 
 namespace Mobge.Sheets {
     [CustomPropertyDrawer(typeof(CellId))]
@@ -99,9 +100,32 @@ namespace Mobge.Sheets {
             UpdateSheetField(meta, property);
 
             PropertyField(property, nameof(SheetData<int>.data));
+            
+
+            foreach(var pp in GetExtraProperties(property)) {
+                float height = EditorGUI.GetPropertyHeight(pp);
+                EditorGUI.PropertyField(s_layout.NextRect(height), pp, true);
+            }
             EditorGUI.indentLevel--;
             meta.height = s_layout.Height;
             return;
+        }
+        private IEnumerable<SerializedProperty> GetExtraProperties(SerializedProperty p) {
+            string[] ignoreList = new string[] {
+                nameof(SheetData.googleSheet), 
+                nameof(SheetData.tableStart),
+                nameof(SheetData<int>.data),
+                nameof(SheetData.mappings)
+            };
+            p.NextVisible(true);
+            int depth = p.depth;
+            do {
+                if(Array.IndexOf(ignoreList, p.name)>=0) {
+                    continue;
+                }
+                yield return p;
+            }
+            while(p.NextVisible(false) && p.depth == depth);
         }
 
         private void UpdateDataButton(Rect rHeader, SerializedProperty property) {
@@ -116,7 +140,7 @@ namespace Mobge.Sheets {
             Rect writeButtonRect = new Rect(updateButtonRect.xMax + 5f, rHeader.y, writeButtonWidth, rHeader.height);
             
             if (GUI.Button(updateButtonRect, gcUpdate)) {
-                _ = UpdateFromSheet(property);
+                UpdateFromSheet(property);
             }
             
             if (GUI.Button(writeButtonRect, gcWrite)) {
