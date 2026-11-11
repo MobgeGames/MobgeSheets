@@ -157,9 +157,8 @@ namespace Mobge.Sheets {
             return edited;
         }
 
-        private void MappingsEditor(SerializedProperty property, Type rowType) {
-            var pMappings = property.FindPropertyRelative(nameof(SheetData.mappings));
-
+        private void MappingsEditor(SerializedProperty pMappings, Type rowType) {
+            
             pMappings.isExpanded = EditorGUI.Foldout(s_layout.NextRect(), pMappings.isExpanded, "Columns", true);
             if (!pMappings.isExpanded) {
                 return;
