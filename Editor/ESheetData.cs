@@ -98,7 +98,7 @@ namespace Mobge.Sheets {
             int depth = property.depth;
             do {
                 if(property.name == nameof(SheetData.mappings)) {
-                    MappingsField(property);
+                    MappingsEditor(property, go.RowType);
                     UpdateSheetField(meta, property);
                 }
                 else {
